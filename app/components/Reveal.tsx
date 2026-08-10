@@ -1,0 +1,50 @@
+"use client";
+
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { cn } from "@/lib/cn";
+
+// เล่น fade+slide-up ตอน element เลื่อนเข้ามาในจอ (IntersectionObserver) — เล่นครั้งเดียวแล้วเลิกสังเกต
+// ไม่ต้องพึ่ง library ภายนอก ใช้ได้กับทุก section ในหน้า landing
+export default function Reveal({
+    children,
+    className,
+    delay = 0,
+}: {
+    children: ReactNode;
+    className?: string;
+    delay?: number;
+}) {
+    const ref = useRef<HTMLDivElement>(null);
+    const [visible, setVisible] = useState(false);
+
+    useEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                if (entry.isIntersecting) {
+                    setVisible(true);
+                    observer.disconnect();
+                }
+            },
+            { threshold: 0.15 }
+        );
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, []);
+
+    return (
+        <div
+            ref={ref}
+            style={{ transitionDelay: `${delay}ms` }}
+            className={cn(
+                "transition-all duration-700 ease-out",
+                visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6",
+                className
+            )}
+        >
+            {children}
+        </div>
+    );
+}
