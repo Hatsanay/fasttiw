@@ -55,7 +55,7 @@ export default async function ProductsPage({
     return (
         <div className="flex flex-col min-h-screen">
             <Navbar />
-            <main className="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 py-10">
+            <main className="flex-1 max-w-[1440px] mx-auto w-full px-4 sm:px-6 py-10">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
                     <h1 className="text-2xl font-semibold text-slate-800">แนวข้อสอบทั้งหมด</h1>
                     <Suspense>

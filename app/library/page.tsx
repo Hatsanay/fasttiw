@@ -3,6 +3,8 @@ import Link from "next/link";
 import { BookOpenCheck, FileQuestion } from "lucide-react";
 import Navbar from "@/app/components/Navbar";
 import Footer from "@/app/components/Footer";
+import ExportPdfButton from "@/app/components/ExportPdfButton";
+import ShareButton from "@/app/components/ShareButton";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
@@ -33,7 +35,7 @@ export default async function LibraryPage() {
     return (
         <div className="flex flex-col min-h-screen">
             <Navbar />
-            <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 py-10">
+            <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-10">
                 <h1 className="text-2xl font-semibold text-slate-800 mb-8">คลังข้อสอบของฉัน</h1>
 
                 {entitlements.length === 0 ? (
@@ -64,6 +66,11 @@ export default async function LibraryPage() {
                                         >
                                             {STATUS_LABEL[e.effective_status]}
                                         </Badge>
+                                        <ShareButton
+                                            url={`/products/${e.ent_product_id}`}
+                                            title={`แนวข้อสอบ ${e.prod_name} | Fasttiw`}
+                                            className="absolute bottom-1.5 right-1.5 h-7 w-7"
+                                        />
                                     </div>
                                     <div className="p-2.5 flex flex-col gap-1.5 flex-1">
                                         <h3 className="text-sm font-medium text-slate-800 line-clamp-2 leading-snug">{e.prod_name}</h3>
@@ -72,11 +79,14 @@ export default async function LibraryPage() {
                                                 หมดอายุ {new Date(e.ent_expires_at).toLocaleDateString("th-TH")}
                                             </p>
                                         )}
-                                        <div className="mt-auto pt-1">
+                                        <div className="mt-auto pt-1 flex flex-col gap-1.5">
                                             {e.effective_status === "active" ? (
-                                                <Link href={`/exam/${e.ent_product_id}`}>
-                                                    <Button size="sm" className="w-full">ทำข้อสอบ</Button>
-                                                </Link>
+                                                <>
+                                                    <Link href={`/exam/${e.ent_product_id}`}>
+                                                        <Button size="sm" className="w-full">ทำข้อสอบ</Button>
+                                                    </Link>
+                                                    <ExportPdfButton productId={e.ent_product_id} />
+                                                </>
                                             ) : (
                                                 <Button size="sm" className="w-full" disabled>
                                                     ใช้งานไม่ได้

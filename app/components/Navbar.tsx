@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BookOpenCheck } from "lucide-react";
+import Image from "next/image";
 import CartLink from "@/app/components/CartLink";
 import UserMenu from "@/app/components/UserMenu";
 import MobileNav from "@/app/components/MobileNav";
@@ -15,17 +15,20 @@ export default async function Navbar() {
 
     return (
         <header className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-100">
-            <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+            <div className="max-w-[1440px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     {/* mobile: ปุ่มแฮมเบอร์เกอร์อยู่ฝั่งซ้าย ตรงข้างเดียวกับที่ sidebar เลื่อนออกมา */}
                     <div className="md:hidden">
                         <MobileNav session={!!session} fullName={fullName} avatarUrl={avatarUrl} />
                     </div>
-                    <Link href={session ? "/library" : "/"} className="flex items-center gap-2 font-semibold text-slate-800">
-                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-600 text-white">
-                            <BookOpenCheck size={18} />
-                        </span>
-                        Fasttiw
+                    <Link href={session ? "/library" : "/"} className="flex items-center">
+                        <Image
+                            src="/logo/fasttiw-logo.svg"
+                            alt="Fasttiw"
+                            width={98}
+                            height={40}
+                            className="h-auto w-[clamp(72px,6vw+40px,110px)] shrink-0"
+                        />
                     </Link>
                 </div>
 

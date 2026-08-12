@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { BookOpenCheck, QrCode } from "lucide-react";
+import Image from "next/image";
+import { QrCode } from "lucide-react";
 
 const LEARN_LINKS = [
     { href: "/products", label: "แนวข้อสอบทั้งหมด" },
@@ -16,13 +17,11 @@ const ACCOUNT_LINKS = [
 export default function Footer() {
     return (
         <footer className="mt-auto border-t border-slate-100 bg-slate-50/50">
-            <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12">
+            <div className="max-w-[1440px] mx-auto px-4 sm:px-6 py-12">
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8">
                     <div className="sm:col-span-2 md:col-span-1">
                         <Link href="/" className="flex items-center gap-2 font-semibold text-slate-800">
-                            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-600 text-white">
-                                <BookOpenCheck size={18} />
-                            </span>
+                            <Image src="/logo/favicon.svg" alt="Fasttiw" width={32} height={32} className="shrink-0" />
                             Fasttiw
                         </Link>
                         <p className="mt-3 text-sm text-slate-500 leading-relaxed max-w-xs">

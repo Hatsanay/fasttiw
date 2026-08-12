@@ -11,7 +11,11 @@ export const contentType = "image/png";
 // ต้องฝัง font Kanit เอง (satori เรนเดอร์ภาษาไทยไม่ได้ถ้าไม่ส่ง font ที่มี glyph ไทยเข้าไปตรงๆ
 // next/font/google ใช้กับ ImageResponse ไม่ได้ — โหลดไฟล์ .ttf จาก app/assets/ แทน)
 export default async function Image() {
-    const kanit = await readFile(join(process.cwd(), "app/assets/Kanit-SemiBold.ttf"));
+    const [kanit, icon] = await Promise.all([
+        readFile(join(process.cwd(), "app/assets/Kanit-SemiBold.ttf")),
+        readFile(join(process.cwd(), "public/logo/icon-512.png")),
+    ]);
+    const iconSrc = `data:image/png;base64,${icon.toString("base64")}`;
 
     return new ImageResponse(
         (
@@ -27,20 +31,8 @@ export default async function Image() {
                     fontFamily: "Kanit",
                 }}
             >
-                <div
-                    style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        width: 96,
-                        height: 96,
-                        borderRadius: 9999,
-                        background: "rgba(255,255,255,0.15)",
-                        marginBottom: 32,
-                    }}
-                >
-                    <div style={{ display: "flex", fontSize: 48 }}>📘</div>
-                </div>
+                {/* eslint-disable-next-line @next/next/no-img-element -- ImageResponse (Satori) ต้องใช้ <img> ธรรมดา ใช้ next/image ไม่ได้ */}
+                <img src={iconSrc} width={96} height={96} style={{ marginBottom: 32 }} alt="" />
                 <div style={{ display: "flex", fontSize: 72, fontWeight: 600, color: "white" }}>Fasttiw</div>
                 <div style={{ display: "flex", fontSize: 32, color: "rgba(255,255,255,0.9)", marginTop: 16 }}>
                     แนวข้อสอบออนไลน์พร้อมเฉลยละเอียด

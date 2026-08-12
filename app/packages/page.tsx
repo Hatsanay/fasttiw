@@ -3,6 +3,7 @@ import { Layers, Check } from "lucide-react";
 import Navbar from "@/app/components/Navbar";
 import Footer from "@/app/components/Footer";
 import Card from "@/components/ui/Card";
+import ShareButton from "@/app/components/ShareButton";
 import { getPublicPackages, productCoverUrl, formatBaht } from "@/lib/api";
 import { getSession } from "@/lib/session";
 import BuyPackageButton from "./BuyPackageButton";
@@ -18,7 +19,7 @@ export default async function PackagesPage() {
     return (
         <div className="flex flex-col min-h-screen">
             <Navbar />
-            <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 py-10">
+            <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-10">
                 <h1 className="text-2xl font-semibold text-slate-800 mb-2">แพ็กเกจสุดคุ้ม</h1>
                 <p className="text-sm text-slate-500 mb-8">ซื้อรวมหลายชุดในราคาพิเศษ ประหยัดกว่าซื้อแยก</p>
 
@@ -32,7 +33,7 @@ export default async function PackagesPage() {
                         {packages.map((pkg) => {
                             const pkgCover = productCoverUrl(pkg.pkg_cover_url);
                             return (
-                                <Card key={pkg.pkg_id} className="overflow-hidden flex flex-col">
+                                <Card key={pkg.pkg_id} id={pkg.pkg_id} className="overflow-hidden flex flex-col">
                                     <div className="relative aspect-video bg-slate-50">
                                         {pkgCover ? (
                                             <Image src={pkgCover} alt={pkg.pkg_name} fill className="object-cover" sizes="(max-width: 640px) 100vw, 50vw" />
@@ -41,6 +42,11 @@ export default async function PackagesPage() {
                                                 <Layers size={32} />
                                             </div>
                                         )}
+                                        <ShareButton
+                                            url={`/packages#${pkg.pkg_id}`}
+                                            title={`แพ็กเกจ ${pkg.pkg_name} | Fasttiw`}
+                                            className="absolute bottom-1.5 right-1.5 h-7 w-7"
+                                        />
                                     </div>
                                     <div className="p-5 flex flex-col flex-1">
                                         <h2 className="font-semibold text-slate-900 mb-1">{pkg.pkg_name}</h2>

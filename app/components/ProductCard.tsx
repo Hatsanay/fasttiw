@@ -3,6 +3,7 @@ import Link from "next/link";
 import { FileQuestion, CheckCircle2 } from "lucide-react";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
+import ShareButton from "@/app/components/ShareButton";
 import { productCoverUrl, formatBaht, type Product } from "@/lib/api";
 
 export default function ProductCard({
@@ -33,6 +34,11 @@ export default function ProductCard({
                             ซื้อแล้ว
                         </span>
                     )}
+                    <ShareButton
+                        url={`/products/${product.prod_id}`}
+                        title={`แนวข้อสอบ ${product.prod_name} | Fasttiw`}
+                        className="absolute bottom-1.5 right-1.5 h-7 w-7"
+                    />
                 </div>
                 <div className="p-2.5 flex flex-col gap-1 flex-1">
                     {product.prod_category_name && !hideCategoryBadge && (

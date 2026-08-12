@@ -9,6 +9,7 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import AddToCartButton from "@/app/components/AddToCartButton";
 import RealSamplePreview from "@/app/components/RealSamplePreview";
+import ShareButton from "@/app/components/ShareButton";
 import { getPublicProduct, getSampleQuestions, productCoverUrl, formatBaht } from "@/lib/api";
 import { getOwnedProductIds } from "@/lib/session";
 import { SITE_URL } from "@/lib/site";
@@ -91,7 +92,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                 dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
             />
             <Navbar />
-            <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 py-10">
+            <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-10">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 sm:gap-12">
                     <div className="relative aspect-4/3 bg-slate-50 rounded-2xl overflow-hidden border border-slate-100">
                         {cover ? (
@@ -101,6 +102,11 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                                 <FileQuestion size={56} />
                             </div>
                         )}
+                        <ShareButton
+                            url={`/products/${product.prod_id}`}
+                            title={`แนวข้อสอบ ${product.prod_name} | Fasttiw`}
+                            className="absolute bottom-2 right-2 h-8 w-8"
+                        />
                     </div>
 
                     <div className="flex flex-col">
