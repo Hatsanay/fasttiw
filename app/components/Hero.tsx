@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Sparkles, Smartphone, ListChecks, Timer, Bookmark, History, BadgePercent, LayoutGrid, GraduationCap, NotebookPen, QrCode, ArrowRight } from "lucide-react";
+import { Sparkles, Smartphone, ListChecks, Timer, Bookmark, History, BadgePercent, LayoutGrid, GraduationCap, NotebookPen, QrCode, Download, ArrowRight } from "lucide-react";
 import Button from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
 import {
@@ -17,6 +17,7 @@ import {
     UniversityMockup,
     CourseworkMockup,
     QrPaymentMockup,
+    PdfDownloadMockup,
 } from "./ExamPreviewMockup";
 
 const ROTATE_MS = 4500;
@@ -109,6 +110,14 @@ const VARIANTS = [
         headlineHighlight: "แค่สแกน QR พร้อมเพย์",
         subtitle: "รองรับการชำระผ่านพร้อมเพย์ สแกนจ่ายได้ทันที ไม่ต้องกรอกบัตร",
         Mockup: QrPaymentMockup,
+    },
+    {
+        badgeIcon: Download,
+        badge: "โหลดเป็น PDF ฝึกทำแบบออฟไลน์ได้",
+        headlineTop: "อยากฝึกแบบกระดาษ",
+        headlineHighlight: "ก็โหลด PDF ไปพิมพ์ได้",
+        subtitle: "ดาวน์โหลดแนวข้อสอบเป็นไฟล์ PDF พร้อมเฉลยและวิธีคิด เอาไปพิมพ์ฝึกทำแบบออฟไลน์ได้ทุกเมื่อ",
+        Mockup: PdfDownloadMockup,
     },
 ];
 

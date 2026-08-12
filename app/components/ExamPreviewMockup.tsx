@@ -14,6 +14,7 @@ import {
     GraduationCap,
     NotebookPen,
     QrCode,
+    Download,
 } from "lucide-react";
 
 // mockup หน้าจอทำข้อสอบ/เฉลย ใช้แทนรูปภาพจริงในหน้า landing — โชว์จุดขายหลัก (เฉลยละเอียด
@@ -610,6 +611,61 @@ export function QrPaymentMockup() {
                 <div className="absolute -bottom-4 -left-3 sm:-left-6 -rotate-3 rounded-xl bg-white shadow-lg shadow-slate-200/80 border border-slate-100 px-3 py-2">
                     <p className="text-[10px] text-slate-400">ไม่ต้อง</p>
                     <p className="text-sm font-semibold text-brand-600">กรอกบัตร</p>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// สไตล์ต่างจากมุมมองอื่น (ไม่ใช้ browser chrome/มือถือ) เพราะสื่อว่านี่คือ "ไฟล์" ที่ดาวน์โหลดออกไปได้
+// จริงๆ ไม่ใช่แค่หน้าจอในแอป — ใส่ลายน้ำจางๆ ทะแยงมุมเลียนแบบของจริงในไฟล์ PDF ที่ export ออกไปด้วย
+export function PdfDownloadMockup() {
+    return (
+        <div className="flex items-center justify-center">
+            <div className="relative w-full max-w-sm lg:max-w-none">
+                <div className="relative rotate-1 rounded-2xl border border-slate-100 bg-white shadow-xl shadow-slate-200/70 overflow-hidden">
+                    <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+                        <span className="flex items-center gap-1.5 text-xs text-slate-400 truncate">
+                            <Download size={12} className="shrink-0" />
+                            fasttiw-แนวข้อสอบ-ก.พ.pdf
+                        </span>
+                        <span className="shrink-0 rounded bg-red-50 px-1.5 py-0.5 text-[9px] font-semibold text-red-500">PDF</span>
+                    </div>
+
+                    <div className="relative overflow-hidden p-5">
+                        <p className="pointer-events-none absolute inset-0 flex -rotate-12 items-center justify-center text-4xl font-bold text-slate-100 select-none">
+                            FASTTIW
+                        </p>
+
+                        <div className="relative">
+                            <p className="text-xs text-slate-400 mb-2">ข้อ 12.</p>
+                            <p className="font-medium text-slate-800 mb-4 leading-relaxed">อนุกรมต่อไปนี้ 2, 4, 8, 16, ... ตัวเลขถัดไปคือข้อใด?</p>
+
+                            <div className="flex flex-col gap-2 mb-4">
+                                <div className="flex items-center justify-between rounded-lg border-2 border-green-300 bg-green-50 px-3 py-2 text-sm">
+                                    <span className="text-slate-700">ก. 32</span>
+                                    <Check size={15} className="text-green-600" />
+                                </div>
+                                <div className="rounded-lg border border-slate-100 px-3 py-2 text-sm text-slate-400">ข. 24</div>
+                            </div>
+
+                            <div className="rounded-lg bg-brand-50/70 border border-brand-100 p-3">
+                                <p className="text-[11px] font-medium text-brand-700 mb-1">วิธีคิด</p>
+                                <p className="text-xs text-slate-600 leading-relaxed">แต่ละพจน์คูณด้วย 2 เสมอ ดังนั้น 16×2 = 32</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="absolute -top-4 -right-3 sm:-right-6 rotate-6 flex items-center gap-1.5 rounded-full bg-white shadow-lg shadow-slate-200/80 border border-slate-100 px-3 py-1.5">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-50 text-brand-600">
+                        <Download size={12} />
+                    </span>
+                    <span className="text-xs font-medium text-slate-600">โหลดเก็บไว้ฝึกได้</span>
+                </div>
+                <div className="absolute -bottom-4 -left-3 sm:-left-6 -rotate-3 rounded-xl bg-white shadow-lg shadow-slate-200/80 border border-slate-100 px-3 py-2">
+                    <p className="text-[10px] text-slate-400">พร้อมพิมพ์</p>
+                    <p className="text-sm font-semibold text-brand-600">กระดาษ A4</p>
                 </div>
             </div>
         </div>
