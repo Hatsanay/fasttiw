@@ -55,7 +55,7 @@ export default async function HomePage() {
                 <Hero />
 
                 {/* How it works */}
-                <section className="max-w-[1440px] mx-auto px-4 sm:px-6 pb-20">
+                <section className="max-w-360 mx-auto px-4 sm:px-6 pb-20">
                     <Reveal className="text-center mb-12">
                         <p className="text-sm font-medium text-brand-600 mb-2">ใช้งานง่ายใน 3 ขั้นตอน</p>
                         <h2 className="text-2xl sm:text-3xl font-semibold text-slate-900">เริ่มเตรียมสอบได้ทันที</h2>
@@ -84,7 +84,7 @@ export default async function HomePage() {
                     <div className="pointer-events-none absolute -top-24 -left-24 h-72 w-72 rounded-full bg-brand-100/60 blur-3xl" />
                     <div className="pointer-events-none absolute -bottom-24 -right-24 h-72 w-72 rounded-full bg-brand-100/40 blur-3xl" />
 
-                    <div className="relative max-w-[1440px] mx-auto px-4 sm:px-6 py-20">
+                    <div className="relative max-w-360 mx-auto px-4 sm:px-6 py-20">
                         <Reveal className="text-center mb-12">
                             <p className="text-sm font-medium text-brand-600 mb-2">ทำไมต้องเลือกเรา</p>
                             <h2 className="text-2xl sm:text-3xl font-semibold text-slate-900">ลาก่อนการติวแบบเดิมๆ</h2>
@@ -140,7 +140,7 @@ export default async function HomePage() {
 
                 {/* Categories */}
                 {categories.length > 0 && (
-                    <section className="max-w-[1440px] mx-auto px-4 sm:px-6 pb-20">
+                    <section className="max-w-360 mx-auto px-4 sm:px-6 pb-20">
                         <Reveal className="text-center mb-10">
                             <p className="text-sm font-medium text-brand-600 mb-2">เลือกสนามสอบที่ใช่</p>
                             <h2 className="text-2xl sm:text-3xl font-semibold text-slate-900">เตรียมสอบตรงหมวดหมู่</h2>
@@ -153,7 +153,7 @@ export default async function HomePage() {
 
                 {/* Popular products — เรียงตามยอดซื้อจริง (เติมสุ่มถ้ายังขายไม่ครบ limit ฝั่ง backend) */}
                 {popularProducts.length > 0 && (
-                    <section className="max-w-[1440px] mx-auto px-4 sm:px-6 py-20">
+                    <section className="max-w-360 mx-auto px-4 sm:px-6 py-20">
                         <Reveal className="flex items-end justify-between mb-8">
                             <div>
                                 <p className="text-sm font-medium text-brand-600 mb-1.5">เลือกแล้วเริ่มได้เลย</p>
@@ -180,7 +180,7 @@ export default async function HomePage() {
                     ของฟีดเต็มที่ /news โดยตั้งใจ ติ๊กไว้ตอนยังร่างก็ขึ้นหน้าแรกได้) ใช้การ์ดตัวเดียวกับหน้า /news
                     เป๊ะ (NewsFeedCard) ให้หน้าตาตรงกันไม่ว่าดูจากที่ไหน */}
                 {landingNews.length > 0 && (
-                    <section className="max-w-[1440px] mx-auto px-4 sm:px-6 py-20">
+                    <section className="max-w-360 mx-auto px-4 sm:px-6 py-20">
                         <Reveal className="flex items-end justify-between mb-8">
                             <div>
                                 <p className="text-sm font-medium text-brand-600 mb-1.5">อัปเดตล่าสุดจากทีมงาน</p>
@@ -204,7 +204,7 @@ export default async function HomePage() {
                 )}
 
                 {/* Closing CTA */}
-                <section className="max-w-[1440px] mx-auto px-4 sm:px-6 pb-20">
+                <section className="max-w-360 mx-auto px-4 sm:px-6 pb-20">
                     <Reveal className="relative overflow-hidden rounded-3xl bg-linear-to-br from-brand-600 to-brand-700 px-8 py-14 sm:py-16 text-center">
                         <div className="pointer-events-none absolute -top-16 -right-16 h-56 w-56 rounded-full bg-white/10 blur-2xl" />
                         <div className="pointer-events-none absolute -bottom-20 -left-10 h-56 w-56 rounded-full bg-white/10 blur-2xl" />

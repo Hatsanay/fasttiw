@@ -130,7 +130,7 @@ export default function Hero() {
                 <div className="absolute top-24 -right-24 h-72 w-72 rounded-full bg-brand-50 blur-3xl opacity-60" />
             </div>
 
-            <div className="max-w-[1440px] mx-auto px-4 sm:px-6 pt-16 pb-24 lg:pt-20 grid lg:grid-cols-2 gap-12 lg:gap-8 items-center">
+            <div className="max-w-360 mx-auto px-4 sm:px-6 pt-16 pb-24 lg:pt-20 grid lg:grid-cols-2 gap-12 lg:gap-8 items-center">
                 <div className="text-center lg:text-left">
                     <div className="grid">
                         {VARIANTS.map((v, i) => (

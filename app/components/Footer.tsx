@@ -17,7 +17,7 @@ const ACCOUNT_LINKS = [
 export default function Footer() {
     return (
         <footer className="mt-auto border-t border-slate-100 bg-slate-50/50">
-            <div className="max-w-[1440px] mx-auto px-4 sm:px-6 py-12">
+            <div className="max-w-360 mx-auto px-4 sm:px-6 py-12">
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8">
                     <div className="sm:col-span-2 md:col-span-1">
                         <Link href="/" className="flex items-center gap-2 font-semibold text-slate-800">
