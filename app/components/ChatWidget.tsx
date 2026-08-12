@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { MessageCircle, X, Image as ImageIcon, Send } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { newsImageUrl } from "@/lib/api"; // ฟังก์ชันต่อ origin เต็มให้ path รูปจาก backend — ชื่อผูกกับ
@@ -80,6 +81,12 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
 // ในระบบนี้) ใช้กระตุ้นให้เรียก ensureConversation ซ้ำทันทีที่สถานะ login เปลี่ยน (เช่น login ระหว่างคุยอยู่)
 // ตัวตรวจสอบจริงอยู่ที่ Route Handler (อ่าน cookie httpOnly ฝั่ง server)
 export default function ChatWidget({ isLoggedIn }: { isLoggedIn: boolean }) {
+    // ซ่อนไอคอนตอนกำลังทำข้อสอบจริง (หน้าตอบคำถามทีละข้อ) — ไม่ซ่อนตอนหน้าเลือกโหมด/หน้าดูเฉลยหลังส่ง
+    // เพราะยังไม่ได้ "กำลังทำข้อสอบ" อยู่จริงๆ — เช็คด้วย pathname แทนการไม่ mount ทั้ง component เพื่อให้
+    // state การคุย (ประวัติ/conv_id) ไม่หายไปตอนสลับเข้า-ออกหน้าทำข้อสอบ
+    const pathname = usePathname();
+    const hideOnExam = /^\/exam\/attempts\/[^/]+$/.test(pathname);
+
     const [isOpen, setIsOpen] = useState(false);
     const [convId, setConvId] = useState<string | null>(null);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -204,6 +211,8 @@ export default function ChatWidget({ isLoggedIn }: { isLoggedIn: boolean }) {
             return next;
         });
     }
+
+    if (hideOnExam) return null;
 
     return (
         <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end gap-3">
