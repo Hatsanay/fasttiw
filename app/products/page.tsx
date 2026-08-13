@@ -90,7 +90,7 @@ export default async function ProductsPage({
                         <p>ไม่พบแนวข้อสอบที่ค้นหา</p>
                     </div>
                 ) : search || category || isFreeOnly ? (
-                    <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
                         {products.map((p) => (
                             <ProductCard key={p.prod_id} product={p} owned={ownedProductIds.has(p.prod_id)} />
                         ))}
@@ -100,7 +100,7 @@ export default async function ProductsPage({
                         {categoryGroups.map(({ category: groupCategory, items }) => (
                             <section key={groupCategory} id={encodeURIComponent(groupCategory)} className="scroll-mt-20">
                                 <h2 className="text-lg font-semibold text-slate-800 mb-4">{groupCategory}</h2>
-                                <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
+                                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
                                     {items.map((p) => (
                                         <ProductCard
                                             key={p.prod_id}

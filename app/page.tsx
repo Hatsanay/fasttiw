@@ -163,7 +163,7 @@ export default async function HomePage() {
                                 ดูทั้งหมด <ArrowRight size={16} />
                             </Link>
                         </Reveal>
-                        <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
                             {popularProducts.map((p, i) => (
                                 <Reveal key={p.prod_id} delay={(i % 6) * 80}>
                                     <ProductCard product={p} />
