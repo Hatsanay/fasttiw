@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { MessageCircle, X, Image as ImageIcon, Send } from "lucide-react";
+import { MessageCircle, X, Image as ImageIcon, Send, Download } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { newsImageUrl } from "@/lib/api"; // ฟังก์ชันต่อ origin เต็มให้ path รูปจาก backend — ชื่อผูกกับ
                                           // "news" จากตอนสร้างครั้งแรก แต่จริงๆ เป็น util ทั่วไป ใช้ต่อ
@@ -44,31 +44,99 @@ function Linkified({ text }: { text: string }) {
     );
 }
 
-function MessageImages({ urls }: { urls: string[] }) {
-    // รูปเดียวโชว์เต็มขนาดปกติ หลายรูปจัดเป็นกริด 2 คอลัมน์ (เหมือน Messenger/LINE) กันรูปเดียวถูกบีบเล็ก
-    // เกินไปตอนมีแค่รูปเดียว
-    if (urls.length === 1) {
-        return (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={newsImageUrl(urls[0]) ?? undefined} alt="" className="rounded-lg mb-1.5 max-w-full max-h-56 object-contain" />
-        );
+// fetch เป็น blob ก่อนสร้างลิงก์ดาวน์โหลด แทนการใช้ attribute download ตรงๆ บน <a href> เพราะรูปอยู่คนละ
+// origin กับหน้าเว็บ (backend domain) — attribute download เบราว์เซอร์จะไม่ยอมบังคับดาวน์โหลดข้าม origin
+// ให้ (แค่เปิดรูปในแท็บใหม่แทน) ต้องดึงไฟล์มาเป็น blob local ก่อนถึงจะสั่งดาวน์โหลดได้จริง
+async function downloadImage(url: string) {
+    try {
+        const res = await fetch(url);
+        const blob = await res.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = blobUrl;
+        a.download = url.split("/").pop() || "image";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(blobUrl);
+    } catch {
+        // เปิดรูปในแท็บใหม่แทนถ้าดาวน์โหลดไม่สำเร็จ (เช่น CORS ติด) ยังเห็น/เซฟรูปเองได้
+        window.open(url, "_blank");
     }
+}
+
+function ImageLightbox({ url, onClose }: { url: string; onClose: () => void }) {
     return (
-        <div className="grid grid-cols-2 gap-1 mb-1.5">
-            {urls.map((url, i) => (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img key={i} src={newsImageUrl(url) ?? undefined} alt="" className="rounded-lg w-full h-20 object-cover" />
-            ))}
+        // z-[70] > z-50 ของไอคอนแชทลอย เพื่อให้ lightbox ลอยอยู่บนสุดเสมอ
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4" onClick={onClose}>
+            <div className="relative max-h-full max-w-full" onClick={(e) => e.stopPropagation()}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={url} alt="" className="max-h-[85vh] max-w-full rounded-lg object-contain" />
+                <div className="absolute -top-11 right-0 flex items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={() => downloadImage(url)}
+                        className="flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-slate-700 hover:bg-white transition-colors"
+                        title="ดาวน์โหลดรูป"
+                        aria-label="ดาวน์โหลดรูป"
+                    >
+                        <Download size={16} />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-slate-700 hover:bg-white transition-colors"
+                        title="ปิด"
+                        aria-label="ปิด"
+                    >
+                        <X size={16} />
+                    </button>
+                </div>
+            </div>
         </div>
     );
 }
 
-function MessageBubble({ msg }: { msg: ChatMessage }) {
+function MessageImages({ urls, onImageClick }: { urls: string[]; onImageClick: (url: string) => void }) {
+    // รูปเดียวโชว์เต็มขนาดปกติ หลายรูปจัดเป็นกริด 2 คอลัมน์ (เหมือน Messenger/LINE) กันรูปเดียวถูกบีบเล็ก
+    // เกินไปตอนมีแค่รูปเดียว — กดรูปไหนก็ได้เพื่อดูรูปเต็ม/ซูม (ดู ImageLightbox)
+    if (urls.length === 1) {
+        const full = newsImageUrl(urls[0]);
+        return (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+                src={full ?? undefined}
+                alt=""
+                onClick={() => full && onImageClick(full)}
+                className="rounded-lg mb-1.5 max-w-full max-h-56 object-contain cursor-pointer"
+            />
+        );
+    }
+    return (
+        <div className="grid grid-cols-2 gap-1 mb-1.5">
+            {urls.map((url, i) => {
+                const full = newsImageUrl(url);
+                return (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                        key={i}
+                        src={full ?? undefined}
+                        alt=""
+                        onClick={() => full && onImageClick(full)}
+                        className="rounded-lg w-full h-20 object-cover cursor-pointer"
+                    />
+                );
+            })}
+        </div>
+    );
+}
+
+function MessageBubble({ msg, onImageClick }: { msg: ChatMessage; onImageClick: (url: string) => void }) {
     const isMine = msg.msg_sender_type === "visitor"; // ข้อความของ "ตัวเอง" (ผู้แชท) อยู่ขวาเสมอ ไม่ว่าจะ login หรือไม่
     return (
         <div className={cn("flex", isMine ? "justify-end" : "justify-start")}>
             <div className={cn("max-w-[75%] rounded-2xl px-3.5 py-2 text-sm", isMine ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-800")}>
-                {!!msg.msg_image_urls?.length && <MessageImages urls={msg.msg_image_urls} />}
+                {!!msg.msg_image_urls?.length && <MessageImages urls={msg.msg_image_urls} onImageClick={onImageClick} />}
                 {msg.msg_text && <p className="whitespace-pre-line break-words"><Linkified text={msg.msg_text} /></p>}
             </div>
         </div>
@@ -92,6 +160,7 @@ export default function ChatWidget({ isLoggedIn }: { isLoggedIn: boolean }) {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [text, setText] = useState("");
     const [isSending, setIsSending] = useState(false);
+    const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
     const lastMsgIdRef = useRef<string | null>(null);
@@ -233,7 +302,7 @@ export default function ChatWidget({ isLoggedIn }: { isLoggedIn: boolean }) {
                                 สวัสดีค่ะ มีคำถามหรือข้อสงสัยอะไร ทักมาได้เลยค่ะ 🙂
                             </p>
                         )}
-                        {messages.map((m) => <MessageBubble key={m.msg_id} msg={m} />)}
+                        {messages.map((m) => <MessageBubble key={m.msg_id} msg={m} onImageClick={setLightboxUrl} />)}
                     </div>
                     <form onSubmit={handleSendText} className="border-t border-slate-100 p-2.5 flex items-center gap-1.5 shrink-0">
                         <button
@@ -276,6 +345,8 @@ export default function ChatWidget({ isLoggedIn }: { isLoggedIn: boolean }) {
                     <span className="absolute top-0 right-0 h-3.5 w-3.5 rounded-full bg-red-500 border-2 border-white" />
                 )}
             </button>
+
+            {lightboxUrl && <ImageLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />}
         </div>
     );
 }
