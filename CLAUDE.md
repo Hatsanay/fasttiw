@@ -9,7 +9,7 @@
 **เสร็จแล้ว** (MVP phase 1-6 + phase 2 เกือบครบทั้งหมดตาม `../CLAUDE.md`):
 - landing page (`Hero.tsx` สลับ 11 มุมมองข้อความ+รูปคู่กันอัตโนมัติ), แคตตาล็อกสินค้า (`/products`), หน้ารายละเอียดสินค้า (`/products/[id]` + ลิงก์ตัวอย่างฟรี), ตะกร้าสินค้าฝั่ง client (`/cart`, localStorage)
 - สมัคร/เข้าสู่ระบบ (`/register`, `/login`) + onboarding บังคับเปลี่ยนรหัส/เติมข้อมูล+รูปโปรไฟล์+ยอมรับนโยบายความเป็นส่วนตัว (`OnboardingGate`/`OnboardingModal`)
-- เช็คเอาท์จริง (`/cart` หรือ `/packages` → checkout → `/orders/[id]` ใบเสร็จ) พร้อมชำระเงินจริงผ่าน **Omise PromptPay** — สร้าง QR ให้สแกนตอน checkout เลย, หน้า order poll สถานะเองทุก 4 วิ (`OrderStatusPoller.tsx` + Route Handler แรกของโปรเจกต์ `app/api/orders/[id]/status/route.ts`) จนกว่า webhook จะยืนยัน, แสดงสถานะ pending/paid/cancelled ชัดเจน
+- เช็คเอาท์จริง (`/cart` หรือ `/packages` → checkout → `/orders/[id]` ใบเสร็จ) พร้อมชำระเงินจริงผ่าน **Stripe PromptPay** (ย้ายมาจาก Omise ระหว่างทำโปรเจกต์ — ดู `../CLAUDE.md` ข้อ 6) — สร้าง QR ให้สแกนตอน checkout เลย, หน้า order poll สถานะเองทุก 4 วิ (`OrderStatusPoller.tsx` + Route Handler แรกของโปรเจกต์ `app/api/orders/[id]/status/route.ts`) จนกว่า webhook จะยืนยัน, แสดงสถานะ pending/paid/cancelled ชัดเจน, ยกเลิกคำสั่งซื้อที่ยังไม่จ่ายได้เอง (`CancelOrderButton.tsx` ที่หน้า order เดียวกัน)
 - **ทำข้อสอบจริง**: `/library` → `/exam/[productId]` (เลือกโหมด) → `/exam/attempts/[id]` (ทำทีละข้อ, autosave, timer, auto-submit) → `/exam/attempts/[id]/review` (เฉลยครบ 4 อย่าง + bookmark + แจ้งปัญหาข้อนี้) — รองรับรูปภาพประกอบโจทย์ทุกจุด (`QuestionImage.tsx`) และรูปภาพต่อตัวเลือก (`ChoiceImage.tsx`, ใช้ใน exam runner/review/bookmarks/sample ทุกจุด)
 - **ประวัติ/bookmark/บัญชี**: `/history` (+ สรุปจุดอ่อนรายหมวด), `/bookmarks` (+ แจ้งปัญหาข้อนี้), `/account` (โปรไฟล์/รหัสผ่าน/รูป/อุปกรณ์ที่ล็อกอิน/ขอลบข้อมูลบัญชี)
 - **ตัวอย่างข้อสอบฟรีก่อนซื้อ**: `/products/[id]/sample` (10 ข้อแรก เห็นเฉลยเต็ม ไม่ต้อง login)
@@ -18,7 +18,7 @@
 - **PDPA**: `/privacy`, checkbox ยอมรับตอนสมัคร/onboarding, ปุ่มขอลบข้อมูลบัญชีที่ `/account`
 - **Navbar/UserMenu**: แสดงชื่อเต็ม+รูปโปรไฟล์, responsive (`md:` ขึ้นไปโชว์ลิงก์ตรงๆ, ต่ำกว่านั้นพับเป็น sidebar เลื่อนจากซ้าย `MobileNav.tsx`)
 
-**ยังไม่ทำ**: package กับ coupon ใช้พร้อมกันไม่ได้ (v1 จำกัดไว้) — payment gateway เชื่อม Omise ครบแล้วและ**ทดสอบ end-to-end กับบัญชี Omise test mode จริงผ่านแล้ว** (2026-07-25: checkout→QR จริง→mark charge successful ในแดชบอร์ด Omise→webhook จริงยิงผ่าน ngrok tunnel→ให้สิทธิ์จริงสำเร็จ) ดูหัวข้อ 6 ที่ `../CLAUDE.md` — เหลือแค่สมัคร live account ตอนพร้อมขายจริง
+**ยังไม่ทำ**: package กับ coupon ใช้พร้อมกันไม่ได้ (v1 จำกัดไว้) — payment gateway เชื่อม Stripe ครบแล้วและ**ยืนยัน live mode ใช้งานได้จริงบน production แล้ว** (2026-08-17: ตั้ง webhook endpoint จริง, ทดสอบจ่ายเงินจริงผ่าน PromptPay สำเร็จ ให้สิทธิ์ถูกต้อง) ดูหัวข้อ 6 ที่ `../CLAUDE.md`
 
 **รูปภาพในโจทย์และตัวเลือก**: รองรับทั้งระดับคำถาม (`ques_image_url`) และระดับตัวเลือก (`cho_image_url`) แนบได้ 2 ทาง —
 1. **ฟอร์มสร้าง/แก้ไขคำถามฝั่งแอดมิน** (`frontend/app/(protected)/products/questions/create|edit`) มี `DragDropImage` (มี prop `compact` สำหรับใช้ในแถวตัวเลือกที่แคบ) ต่อคำถาม 1 อัน และต่อตัวเลือกแต่ละอัน — อัปโหลดแยก request หลังบันทึกข้อความสำเร็จ (เหมือนรูปหน้าปก product)
@@ -26,16 +26,16 @@
 
 **ข้อควรระวังเรื่องรูปตัวเลือกตอนแก้ไขคำถาม**: `PUT /products/:id/questions/:id` (update ในแอดมิน) ลบตัวเลือกเก่าทั้งหมดแล้วสร้างใหม่ทุกครั้ง (เหมือนข้อความตัวเลือก) — เพื่อไม่ให้รูปตัวเลือกเดิมหายไปโดยไม่ตั้งใจ ฝั่ง frontend ต้องส่ง `cho_image_url` เดิมกลับไปในแต่ละตัวเลือกที่ไม่ได้แนบรูปใหม่/ไม่ได้กดลบ ("carry over") — backend จะ insert ค่านั้นตรงๆ และลบไฟล์เก่าออกจาก disk เฉพาะ URL ที่ไม่ถูกส่งกลับมาเท่านั้น
 
-**ยังไม่ได้ทดสอบจริงในเบราว์เซอร์**: ทุกอย่างทดสอบผ่าน curl+cookie จริง (ไม่มี browser automation ในสภาพแวดล้อมนี้) — timer auto-submit จริง, การคลิก/ลากจริง (drag-drop รูป, ครอปรูป), หน้า QR PromptPay + poller (`OrderStatusPoller.tsx`) ยังไม่เคยเห็นภาพจริงในเบราว์เซอร์ (แต่ flow เบื้องหลังทั้งหมด — checkout สร้าง charge จริง, webhook จริงยืนยันจ่ายเงิน, ให้สิทธิ์จริง — ทดสอบผ่าน curl + Omise test mode จริงแล้วครบ)
+**ยังไม่ได้ทดสอบจริงในเบราว์เซอร์ (ยกเว้นหน้า QR/ชำระเงินที่ผู้ใช้ทดสอบเองแล้ว)**: ฟีเจอร์ส่วนใหญ่ทดสอบผ่าน curl+cookie จริง (ไม่มี browser automation ในสภาพแวดล้อมนี้) — timer auto-submit จริง, การคลิก/ลากจริง (drag-drop รูป, ครอปรูป) ยังไม่เคยเห็นภาพจริงในเบราว์เซอร์ — ส่วนหน้า QR PromptPay + poller (`OrderStatusPoller.tsx`) ผู้ใช้ทดสอบเองผ่านเบราว์เซอร์จริงบน production แล้ว (2026-08-17: จ่ายเงินจริงผ่าน Stripe PromptPay สำเร็จ ให้สิทธิ์ถูกต้อง)
 
 ## Backend endpoints ที่ใช้ (`/api/V1/store/...`)
 
-- Public: `GET /store/products`, `GET /store/products/:id`, `GET /store/products/:id/sample-questions`, `GET /store/packages`, `POST /store/webhooks/payment` (webhook จาก Omise จริง — verify signature ด้วย HMAC-SHA256 ตาม header `Omise-Signature`/`Omise-Signature-Timestamp` แล้ว)
+- Public: `GET /store/products`, `GET /store/products/:id`, `GET /store/products/:id/sample-questions`, `GET /store/packages`, `POST /store/webhooks/payment` (webhook จาก Stripe จริง — verify signature ผ่าน SDK ทางการ `stripe.webhooks.constructEvent()` แล้ว)
 - ต้อง auth (`Authorization: Bearer <customer JWT>`, payload `{ cus_id, mcp, jti }` — `jti` ใหม่จาก phase จำกัดอุปกรณ์):
   - Auth/onboarding: `POST /store/auth/register`, `POST /store/auth/login`, `GET /store/me`, `PUT /store/me`, `PUT /store/me/password`, `PUT /store/me/onboarding`, `PUT /store/me/image`
   - Session: `GET /store/me/sessions` (รายการอุปกรณ์), `DELETE /store/me/sessions/:id` (เตะอุปกรณ์อื่น)
   - PDPA: `POST /store/me/deletion-request` (ขอลบข้อมูลบัญชี)
-  - Checkout: `POST /store/checkout` (รับ `product_ids` และ/หรือ `package_id` — สร้าง PromptPay charge อัตโนมัติถ้ามี Omise config, คืน `qr_image_url`/`qr_expires_at` มาด้วยถ้าสร้างสำเร็จ), `GET /store/orders/:id` (มี self-heal: เช็คสถานะจริงกับ Omise ตรงๆ ถ้ายัง pending), `GET /store/my/entitlements` — **`POST /store/orders/:id/confirm-payment` (mock) mount แบบมีเงื่อนไขเท่านั้น** (`ALLOW_MOCK_PAYMENT_CONFIRM=true` และยังไม่ตั้ง `OMISE_SECRET_KEY` จริง) — checkoutAction ฝั่งนี้**ไม่เรียก endpoint นี้อัตโนมัติแล้ว** ต้องยิงตรงเอง (curl/Postman) หรือให้แอดมิน force-confirm ที่หน้า `/orders` ฝั่งแอดมินแทนตอนทดสอบ local
+  - Checkout: `POST /store/checkout` (รับ `product_ids` และ/หรือ `package_id` — สร้าง PromptPay PaymentIntent อัตโนมัติถ้ามี Stripe config, คืน `qr_image_url`/`qr_expires_at` มาด้วยถ้าสร้างสำเร็จ), `GET /store/orders/:id` (มี self-heal: เช็คสถานะจริงกับ Stripe ตรงๆ ถ้ายัง pending), `PUT /store/orders/:id/cancel` (ยกเลิกออเดอร์ที่ยังไม่จ่าย — เช็คสถานะจริงกับ Stripe ก่อนยกเลิกเสมอ กัน race กับจ่ายสำเร็จพอดี), `GET /store/my/entitlements` — **`POST /store/orders/:id/confirm-payment` (mock) mount แบบมีเงื่อนไขเท่านั้น** (`ALLOW_MOCK_PAYMENT_CONFIRM=true` และยังไม่ตั้ง `STRIPE_SECRET_KEY` จริง) — checkoutAction ฝั่งนี้**ไม่เรียก endpoint นี้อัตโนมัติแล้ว** ต้องยิงตรงเอง (curl/Postman) หรือให้แอดมิน force-confirm ที่หน้า `/orders` ฝั่งแอดมินแทนตอนทดสอบ local
   - ทำข้อสอบ: `POST /store/products/:id/attempts` (เริ่ม/resume), `GET /store/attempts` (ประวัติ), `GET /store/me/weak-areas` (สรุปจุดอ่อนรายหมวด), `GET /store/attempts/:id`, `PUT /store/attempts/:id/answers/:questionId`, `POST /store/attempts/:id/submit`, `GET /store/attempts/:id/review`
   - Bookmark: `GET /store/bookmarks`, `POST /store/bookmarks/:questionId`, `DELETE /store/bookmarks/:questionId`
   - แจ้งปัญหา: `POST /store/questions/:id/report`

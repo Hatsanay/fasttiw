@@ -67,8 +67,8 @@ async function downloadImage(url: string) {
 
 function ImageLightbox({ url, onClose }: { url: string; onClose: () => void }) {
     return (
-        // z-[70] > z-50 ของไอคอนแชทลอย เพื่อให้ lightbox ลอยอยู่บนสุดเสมอ
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4" onClick={onClose}>
+        // z-70 > z-50 ของไอคอนแชทลอย เพื่อให้ lightbox ลอยอยู่บนสุดเสมอ
+        <div className="fixed inset-0 z-70 flex items-center justify-center bg-black/80 p-4" onClick={onClose}>
             <div className="relative max-h-full max-w-full" onClick={(e) => e.stopPropagation()}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={url} alt="" className="max-h-[85vh] max-w-full rounded-lg object-contain" />
@@ -137,7 +137,7 @@ function MessageBubble({ msg, onImageClick }: { msg: ChatMessage; onImageClick: 
         <div className={cn("flex", isMine ? "justify-end" : "justify-start")}>
             <div className={cn("max-w-[75%] rounded-2xl px-3.5 py-2 text-sm", isMine ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-800")}>
                 {!!msg.msg_image_urls?.length && <MessageImages urls={msg.msg_image_urls} onImageClick={onImageClick} />}
-                {msg.msg_text && <p className="whitespace-pre-line break-words"><Linkified text={msg.msg_text} /></p>}
+                {msg.msg_text && <p className="whitespace-pre-line wrap-break-word"><Linkified text={msg.msg_text} /></p>}
             </div>
         </div>
     );
@@ -289,7 +289,7 @@ export default function ChatWidget({ isLoggedIn }: { isLoggedIn: boolean }) {
                 <div className="w-[min(22rem,calc(100vw-2.5rem))] h-[min(32rem,calc(100vh-8rem))] flex flex-col rounded-2xl border border-slate-200 bg-white shadow-xl overflow-hidden">
                     <div className="flex items-center justify-between px-4 py-3 bg-brand-600 text-white shrink-0">
                         <div className="flex items-center gap-2">
-                            <MessageCircle className="w-[18px] h-[18px]" />
+                            <MessageCircle className="w-4.5 h-4.5" />
                             <span className="text-sm font-medium">ฝ่ายบริการลูกค้า Fasttiw</span>
                         </div>
                         <button type="button" onClick={() => setIsOpen(false)} className="p-1 hover:bg-white/15 rounded-full transition-colors">
