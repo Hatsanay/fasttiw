@@ -5,8 +5,8 @@ import { authorizedFetch } from "@/lib/session";
 export type CheckoutResult = { ord_id: string } | { error: string };
 
 // สร้าง order (pending) แล้วจบแค่นั้น — **ห้าม**เรียกยืนยันจ่ายเงินต่อจากตรงนี้เด็ดขาด (ผิดกฎเหล็กข้อ 1
-// ใน CLAUDE.md: "ให้สิทธิ์เฉพาะตอนรับ webhook เท่านั้น") checkout() ฝั่ง backend สร้าง PromptPay charge +
-// QR ให้เองถ้ามีบัญชี Omise ตั้งไว้แล้ว (คืนมาใน response พร้อม ord_id) หน้า /orders/[id] จะโชว์ QR ให้
+// ใน CLAUDE.md: "ให้สิทธิ์เฉพาะตอนรับ webhook เท่านั้น") checkout() ฝั่ง backend สร้าง PromptPay payment intent +
+// QR ให้เองถ้ามีบัญชี Stripe ตั้งไว้แล้ว (คืนมาใน response พร้อม ord_id) หน้า /orders/[id] จะโชว์ QR ให้
 // สแกนแล้วรอ webhook จริงยืนยันแทน — ไม่มีการ mock-confirm อัตโนมัติจากฝั่ง client อีกต่อไป
 export async function checkoutAction(productIds: string[], couponCode?: string): Promise<CheckoutResult> {
     if (productIds.length === 0) {

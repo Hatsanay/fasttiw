@@ -8,6 +8,7 @@ import Button from "@/components/ui/Button";
 import { authorizedFetch } from "@/lib/session";
 import { formatBaht } from "@/lib/api";
 import OrderStatusPoller from "./OrderStatusPoller";
+import CancelOrderButton from "./CancelOrderButton";
 
 export const metadata = { title: "คำสั่งซื้อของฉัน" };
 
@@ -71,6 +72,10 @@ export default async function OrderReceiptPage({ params }: { params: Promise<{ i
                                 ยังไม่สามารถสร้าง QR ได้ในขณะนี้ — กรุณาติดต่อแอดมินเพื่อยืนยันการชำระเงิน พร้อมแจ้งเลขที่คำสั่งซื้อ {order.ord_id}
                             </p>
                         )}
+
+                        <div className="mt-5">
+                            <CancelOrderButton orderId={order.ord_id} />
+                        </div>
                     </div>
                 )}
 
