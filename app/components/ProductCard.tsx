@@ -4,7 +4,7 @@ import { FileQuestion, CheckCircle2 } from "lucide-react";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import ShareButton from "@/app/components/ShareButton";
-import { productCoverUrl, formatBaht, type Product } from "@/lib/api";
+import { productCoverUrl, formatBaht, compareAtPrice, type Product } from "@/lib/api";
 
 export default function ProductCard({
     product,
@@ -16,6 +16,7 @@ export default function ProductCard({
     hideCategoryBadge?: boolean;
 }) {
     const cover = productCoverUrl(product.prod_cover_url);
+    const comparePrice = compareAtPrice(product);
 
     return (
         <Link href={`/products/${product.prod_id}`}>
@@ -52,7 +53,12 @@ export default function ProductCard({
                         {product.prod_is_free ? (
                             <span className="text-sm font-semibold text-green-600">ฟรี</span>
                         ) : (
-                            <span className="text-sm font-semibold text-brand-600">{formatBaht(product.prod_price)}</span>
+                            <span className="flex items-baseline gap-1.5 flex-wrap justify-end">
+                                {comparePrice != null && (
+                                    <span className="text-[10px] text-slate-400 line-through whitespace-nowrap">{formatBaht(comparePrice)}</span>
+                                )}
+                                <span className="text-sm font-semibold text-brand-600 whitespace-nowrap">{formatBaht(product.prod_price)}</span>
+                            </span>
                         )}
                     </div>
                 </div>

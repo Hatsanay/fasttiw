@@ -4,6 +4,7 @@ export type Product = {
     prod_id: string;
     prod_name: string;
     prod_price: string;
+    prod_compare_price: string | null;
     prod_is_free: boolean;
     prod_cover_url: string | null;
     prod_category_id: string | null;
@@ -180,4 +181,13 @@ export function formatBaht(price: string | number): string {
 // เป็นคนตัดสินราคาจริงที่เก็บเงินอยู่ดี ฝั่งนี้แค่ต้องโชว์ตรงกับสิ่งที่จะเกิดขึ้นจริงตอน checkout
 export function effectivePrice(item: { prod_price: string | number; prod_is_free: boolean }): number {
     return item.prod_is_free ? 0 : Number(item.prod_price) || 0;
+}
+
+// ราคาปกติที่ควรโชว์ขีดฆ่าคู่กับราคาขายจริง (สร้างความรู้สึกว่ากำลังลดราคา) — คืน null ถ้าไม่ควรโชว์
+// (product แจกฟรีใช้ prod_price เป็น "ราคาปกติ" ของตัวเองอยู่แล้วผ่าน field เดิม ไม่เกี่ยวกับ compare price นี้
+// และถ้า compare price ตั้งไว้ต่ำกว่าหรือเท่ากับราคาขายจริง แสดงว่าไม่ใช่ส่วนลด ไม่ควรโชว์ขีดฆ่า)
+export function compareAtPrice(item: { prod_price: string | number; prod_compare_price: string | number | null; prod_is_free: boolean }): number | null {
+    if (item.prod_is_free || item.prod_compare_price == null) return null;
+    const compare = Number(item.prod_compare_price) || 0;
+    return compare > effectivePrice(item) ? compare : null;
 }

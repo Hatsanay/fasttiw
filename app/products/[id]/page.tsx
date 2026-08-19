@@ -10,7 +10,7 @@ import Button from "@/components/ui/Button";
 import AddToCartButton from "@/app/components/AddToCartButton";
 import RealSamplePreview from "@/app/components/RealSamplePreview";
 import ShareButton from "@/app/components/ShareButton";
-import { getPublicProduct, getSampleQuestions, productCoverUrl, formatBaht } from "@/lib/api";
+import { getPublicProduct, getSampleQuestions, productCoverUrl, formatBaht, compareAtPrice } from "@/lib/api";
 import { getOwnedProductIds } from "@/lib/session";
 import { SITE_URL } from "@/lib/site";
 
@@ -63,6 +63,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
 
     const owned = ownedProductIds.has(id);
     const cover = productCoverUrl(product.prod_cover_url);
+    const comparePrice = compareAtPrice(product);
     // เลือกข้อที่มีตัวเลือกผิดพร้อม wrong_reason ให้โชว์ครบทั้ง 2 จุดขาย (วิธีคิด + เหตุผลตัวเลือกผิด)
     const demoQuestion = sampleQuestions.find((q) =>
         q.reveal.choice_reasons.some((r) => !r.is_correct && r.wrong_reason)
@@ -126,16 +127,21 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                             <p className="text-slate-600 leading-relaxed mb-8 whitespace-pre-line">{product.prod_description}</p>
                         )}
 
-                        <div className="mt-auto flex items-center justify-between gap-4 pt-6 border-t border-slate-100">
+                        <div className="mt-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 pt-6 border-t border-slate-100">
                             {product.prod_is_free ? (
-                                <span className="flex items-baseline gap-2">
+                                <span className="flex items-baseline gap-2 flex-wrap">
                                     {Number(product.prod_price) > 0 && (
-                                        <span className="text-sm text-slate-400 line-through">{formatBaht(product.prod_price)}</span>
+                                        <span className="text-sm text-slate-400 line-through whitespace-nowrap">{formatBaht(product.prod_price)}</span>
                                     )}
-                                    <span className="text-2xl font-semibold text-green-600">ฟรี</span>
+                                    <span className="text-2xl font-semibold text-green-600 whitespace-nowrap">ฟรี</span>
                                 </span>
                             ) : (
-                                <span className="text-2xl font-semibold text-brand-600">{formatBaht(product.prod_price)}</span>
+                                <span className="flex items-baseline gap-2 flex-wrap">
+                                    {comparePrice != null && (
+                                        <span className="text-sm text-slate-400 line-through whitespace-nowrap">{formatBaht(comparePrice)}</span>
+                                    )}
+                                    <span className="text-2xl font-semibold text-brand-600 whitespace-nowrap">{formatBaht(product.prod_price)}</span>
+                                </span>
                             )}
                             {owned ? (
                                 <Link href={`/exam/${product.prod_id}`}>
