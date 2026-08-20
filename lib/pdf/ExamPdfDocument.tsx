@@ -17,14 +17,19 @@ Font.register({
 
 const THAI_CHOICE_LETTERS = ["ก", "ข", "ค", "ง", "จ", "ฉ", "ช", "ซ", "ฌ", "ญ"];
 
-// จำนวน tile ของลายน้ำ — ครอบคลุมพื้นที่ที่หมุนเอียงแล้วให้เต็มหน้า A4 พอดี (ดูที่มาตัวเลขใน watermarkGrid)
-const WATERMARK_TILE_COUNT = 63;
-
 const styles = StyleSheet.create({
     page: { fontFamily: "Kanit", fontSize: 11, paddingTop: 50, paddingBottom: 50, paddingHorizontal: 45, color: "#1e293b" },
 
-    // ลายน้ำ: วาง grid โลโก้จางๆ ในกล่องที่ใหญ่กว่าหน้ากระดาษมาก แล้วหมุนเอียง 30 องศา ให้แน่ใจว่าหลังหมุน
-    // แล้วยังคลุมทุกมุมของหน้า A4 (595x842pt) ไม่มีช่องว่าง — fixed ทำให้ซ้ำทุกหน้าอัตโนมัติ
+    // ลายน้ำ: วางกริดลายจางๆ ในกล่องที่ใหญ่กว่าหน้ากระดาษมาก แล้วหมุนเอียง 30 องศา ให้แน่ใจว่าหลังหมุนแล้ว
+    // ยังคลุมทุกมุมของหน้า A4 (595x842pt) ไม่มีช่องว่าง — fixed ทำให้ซ้ำทุกหน้าอัตโนมัติ
+    //
+    // เดิมวาง <PdfImage> โลโก้จางๆ 63 ก้อนแยกกันในกริดนี้ (ผ่าน flexWrap) แล้วให้ react-pdf จัด layout เอง —
+    // วัดจริงพบว่า react-pdf/pdfkit ไม่ dedupe รูปเดียวกันที่วางซ้ำหลายจุด แต่ละจุดฝังข้อมูลภาพซ้ำใหม่ทุกครั้ง
+    // (ชุดข้อสอบ 282 ข้อ ~26 หน้า: 63 tiles/หน้า -> ไฟล์ 29.8MB, render 48 วิ / เปลี่ยนมาใช้ภาพ pre-composite
+    // ภาพเดียว -> ไฟล์ 3.6MB, render 33 วิ) จึงเปลี่ยนมาใช้ `watermark-tiled.png` (สร้างล่วงหน้าครั้งเดียวด้วย
+    // `scripts/build-tiled-watermark.mjs` ไม่ใช่ตอน render จริง — รันสคริปต์นั้นใหม่ถ้าจะเปลี่ยนโลโก้ต้นฉบับ)
+    // ที่มี pattern เหมือนเดิมทุกประการ ฝังภาพแค่ 1 จุดต่อหน้าแทน 63 จุด ผลลัพธ์ที่เห็นเหมือนเดิมเป๊ะ แค่เร็ว
+    // ขึ้น+ไฟล์เล็กลงมาก
     watermarkLayer: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, overflow: "hidden" },
     watermarkGrid: {
         position: "absolute",
@@ -32,12 +37,8 @@ const styles = StyleSheet.create({
         left: -220,
         width: 1000,
         height: 1300,
-        flexDirection: "row",
-        flexWrap: "wrap",
-        alignContent: "flex-start",
         transform: "rotate(-30deg)",
     },
-    watermarkItem: { width: 100, height: 40.8, marginTop: 36, marginBottom: 36, marginLeft: 20, marginRight: 20, opacity: 0.07 },
 
     header: { marginBottom: 18, paddingBottom: 14, borderBottomWidth: 1.5, borderBottomColor: "#1D4ED8", borderBottomStyle: "solid" },
     brandText: { fontSize: 9, fontWeight: "semibold", color: "#1D4ED8", letterSpacing: 1, marginBottom: 10 },
@@ -104,20 +105,18 @@ export type ExportPdfQuestion = {
 export function ExamPdfDocument({
     productName,
     questions,
-    watermarkImage,
+    watermarkTiledImage,
 }: {
     productName: string;
     questions: ExportPdfQuestion[];
-    watermarkImage: Buffer;
+    watermarkTiledImage: Buffer;
 }) {
     return (
         <Document title={`แนวข้อสอบ ${productName}`}>
             <Page size="A4" style={styles.page} wrap>
                 <View style={styles.watermarkLayer} fixed>
                     <View style={styles.watermarkGrid}>
-                        {Array.from({ length: WATERMARK_TILE_COUNT }).map((_, i) => (
-                            <PdfImage key={i} src={watermarkImage} style={styles.watermarkItem} />
-                        ))}
+                        <PdfImage src={watermarkTiledImage} style={{ width: 1000, height: 1300 }} />
                     </View>
                 </View>
 
@@ -176,9 +175,10 @@ export function ExamPdfDocument({
     );
 }
 
-// watermark.png คือเวอร์ชันย่อขนาด+พื้นหลังโปร่งใสของ fasttiw-logo.svg (สร้างด้วย sharp ไว้แล้ว) — ใช้
-// ตัวเต็ม fasttiw-logo.png (1600x653, พื้นหลังทึบขาว) ตรงๆ ไม่ได้ เพราะซ้ำ 63 ครั้งต่อหน้าจะทำให้ไฟล์
-// ใหญ่เกินจำเป็น (ทดสอบแล้วได้ 11MB+) และพื้นหลังทึบจะทำให้ลายน้ำดูเป็นสี่เหลี่ยมแทนที่จะจางกลืนไปกับหน้า
-export function loadWatermarkImage(): Buffer {
-    return readFileSync(join(process.cwd(), "public/logo/watermark.png"));
+// watermark-tiled.png คือ pattern โลโก้จางๆ (opacity 7%) แบบ pre-composite ไว้ล่วงหน้าเป็นภาพแบนภาพเดียว
+// (grid 7 คอลัมน์ครอบคลุมพื้นที่ 1000x1300 — สร้างจาก watermark.png ต้นฉบับผ่าน sharp ครั้งเดียว ไม่ใช่
+// ตอน render จริง) แทนที่จะวาง <PdfImage> 63 ก้อนแยกกันแล้วให้ react-pdf จัด layout เอง ดูเหตุผลเต็มๆ ที่
+// comment ของ watermarkGrid ด้านบน
+export function loadWatermarkTiledImage(): Buffer {
+    return readFileSync(join(process.cwd(), "public/logo/watermark-tiled.png"));
 }

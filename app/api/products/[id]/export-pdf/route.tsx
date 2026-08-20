@@ -3,7 +3,7 @@ import sharp from "sharp";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { authorizedFetch } from "@/lib/session";
 import { productCoverUrl } from "@/lib/api";
-import { ExamPdfDocument, loadWatermarkImage, type ExportPdfQuestion } from "@/lib/pdf/ExamPdfDocument";
+import { ExamPdfDocument, loadWatermarkTiledImage, type ExportPdfQuestion } from "@/lib/pdf/ExamPdfDocument";
 
 type RawQuestion = {
     ques_id: string;
@@ -65,9 +65,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const data: { prod_name: string; questions: RawQuestion[] } = await res.json();
     const questions = await Promise.all(data.questions.map(toPdfQuestion));
 
-    const watermarkImage = loadWatermarkImage();
+    const watermarkTiledImage = loadWatermarkTiledImage();
     const buffer = await renderToBuffer(
-        <ExamPdfDocument productName={data.prod_name} questions={questions} watermarkImage={watermarkImage} />
+        <ExamPdfDocument productName={data.prod_name} questions={questions} watermarkTiledImage={watermarkTiledImage} />
     );
 
     return new NextResponse(new Uint8Array(buffer), {
