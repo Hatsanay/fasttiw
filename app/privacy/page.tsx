@@ -2,7 +2,10 @@ import Navbar from "@/app/components/Navbar";
 import Footer from "@/app/components/Footer";
 import Card from "@/components/ui/Card";
 
-export const metadata = { title: "นโยบายความเป็นส่วนตัว" };
+export const metadata = {
+    title: "นโยบายความเป็นส่วนตัว",
+    alternates: { canonical: "/privacy" },
+};
 
 // ร่างนโยบายความเป็นส่วนตัวเบื้องต้นตาม PDPA — เป็นฉบับร่างสำหรับใช้งานจริงชั่วคราวเท่านั้น
 // ควรให้ทนายความตรวจสอบก่อนเผยแพร่ใช้งานจริง ตามที่ระบุไว้ใน CLAUDE.md ข้อ 8

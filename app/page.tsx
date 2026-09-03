@@ -10,6 +10,7 @@ import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import NewsFeedCard from "@/app/news/NewsFeedCard";
 import { getPublicProducts, getPublicCategories, getPopularProducts, getLandingNewsBlocks } from "@/lib/api";
+import { SITE_URL } from "@/lib/site";
 
 const HIGHLIGHTS = [
     {
@@ -40,6 +41,12 @@ const STEPS = [
     { icon: CheckCheck, title: "ดูเฉลยทุกข้อ", description: "เข้าใจวิธีคิดและจุดผิดพลาดของตัวเองก่อนสอบจริง" },
 ];
 
+// canonical ของหน้าแรก — ต้องประกาศรายหน้า (ตั้งใน layout ไม่ได้ เพราะจะกลายเป็น URL เดียวกันทุกหน้า)
+// กัน duplicate content เพราะเว็บเข้าถึงได้หลายรูปแบบ (มี/ไม่มี www, มี/ไม่มี query string)
+export const metadata = {
+    alternates: { canonical: "/" },
+};
+
 export default async function HomePage() {
     const [{ data: products }, categories, popularProducts, landingNews] = await Promise.all([
         getPublicProducts({ limit: 100 }),
@@ -48,8 +55,37 @@ export default async function HomePage() {
         getLandingNewsBlocks(),
     ]);
 
+    // structured data ระดับเว็บไซต์ — บอก Google ว่าเว็บนี้คือใคร (Organization) และเป็นเว็บไซต์ชื่ออะไร
+    // (WebSite) ใช้แสดงผลเป็น knowledge panel / ชื่อแบรนด์ในผลค้นหา — escape "<" กันสตริง "</script>"
+    // ที่อาจหลุดมาปนตัดแท็กก่อนเวลา (หลักการเดียวกับหน้ารายละเอียดสินค้า)
+    const jsonLd = {
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "Organization",
+                "@id": `${SITE_URL}/#organization`,
+                name: "Fasttiw",
+                url: SITE_URL,
+                logo: `${SITE_URL}/logo/icon-512.png`,
+                description: "แนวข้อสอบออนไลน์พร้อมเฉลยละเอียดทีละขั้นตอน ทำข้อสอบได้จริงบนเว็บ",
+            },
+            {
+                "@type": "WebSite",
+                "@id": `${SITE_URL}/#website`,
+                name: "Fasttiw",
+                url: SITE_URL,
+                inLanguage: "th-TH",
+                publisher: { "@id": `${SITE_URL}/#organization` },
+            },
+        ],
+    };
+
     return (
         <div className="flex flex-col min-h-screen">
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
+            />
             <Navbar />
             <main className="flex-1">
                 <Hero />

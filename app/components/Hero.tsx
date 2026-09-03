@@ -142,7 +142,13 @@ export default function Hero() {
             <div className="max-w-360 mx-auto px-4 sm:px-6 pt-16 pb-24 lg:pt-20 grid lg:grid-cols-2 gap-12 lg:gap-8 items-center">
                 <div className="text-center lg:text-left">
                     <div className="grid">
-                        {VARIANTS.map((v, i) => (
+                        {VARIANTS.map((v, i) => {
+                            // ทุก variant ถูก render ลง DOM พร้อมกันหมด (สลับด้วย opacity ไม่ใช่ mount/unmount)
+                            // ถ้าใช้ <h1> ทุกอันจะได้ h1 11 ตัวในหน้าเดียว Google ไม่รู้ว่าหัวข้อหลักของหน้าคืออะไร
+                            // จึงให้ variant แรก (ตัวที่ผู้ใช้เห็นตอนโหลดหน้าเสมอ) เป็น h1 ตัวจริงตัวเดียว
+                            // ที่เหลือเป็น <p> ที่หน้าตาเหมือนกันเป๊ะ — ผู้ใช้เห็นไม่ต่างเลย
+                            const Headline = i === 0 ? "h1" : "p";
+                            return (
                             <div
                                 key={i}
                                 className={cn(
@@ -155,19 +161,20 @@ export default function Hero() {
                                     {v.badge}
                                 </span>
 
-                                <h1 className="text-4xl sm:text-5xl lg:text-6xl font-semibold tracking-tight text-slate-900 leading-[1.1]">
+                                <Headline className="text-4xl sm:text-5xl lg:text-6xl font-semibold tracking-tight text-slate-900 leading-[1.1]">
                                     {v.headlineTop}
                                     <br />
                                     <span className="bg-linear-to-r from-brand-600 to-brand-400 bg-clip-text text-transparent">
                                         {v.headlineHighlight}
                                     </span>
-                                </h1>
+                                </Headline>
 
                                 <p className="mt-6 text-slate-500 text-base sm:text-lg max-w-xl mx-auto lg:mx-0 leading-relaxed">
                                     {v.subtitle}
                                 </p>
                             </div>
-                        ))}
+                            );
+                        })}
                     </div>
 
                     <div className="mt-9 flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3">

@@ -7,6 +7,7 @@ import NewsFeedCard from "./NewsFeedCard";
 export const metadata = {
     title: "ข่าวสาร",
     description: "ข่าวสารและประกาศล่าสุดจากทีมงาน เช่น แนวข้อสอบชุดใหม่ โปรโมชั่น และการปรับปรุงระบบ",
+    alternates: { canonical: "/news" },
 };
 
 // ไม่มี "โพสต์" แยกให้คลิกเข้าไปดูทีละอันอีกต่อไป — เห็นทั้งฟีด (ทุก widget ที่แอดมิน publish ไว้) ในหน้า

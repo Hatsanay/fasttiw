@@ -6,11 +6,15 @@ import Footer from "@/app/components/Footer";
 import ProductCard from "@/app/components/ProductCard";
 import SearchBox from "@/app/components/SearchBox";
 import { getPublicProducts, type Product } from "@/lib/api";
+import { SITE_URL } from "@/lib/site";
 import { getOwnedProductIds } from "@/lib/session";
 
 export const metadata = {
     title: "แนวข้อสอบทั้งหมด",
     description: "รวมแนวข้อสอบออนไลน์ทุกหมวดหมู่ ทำได้จริงบนเว็บ พร้อมเฉลยละเอียดทีละขั้นตอน เลือกซื้อเป็นชุดตามที่ต้องการเตรียมสอบ",
+    // canonical ชี้หน้า /products เปล่าๆ เสมอ ไม่รวม query string (?search=/?category=/?free=) — หน้าที่กรอง
+    // แล้วเป็นมุมมองย่อยของรายการเดียวกัน ไม่ควรให้ Google เก็บเป็นหน้าซ้ำหลายเวอร์ชัน
+    alternates: { canonical: "/products" },
 };
 
 // ไม่แบ่งหมวดหมู่ตอนค้นหา (ผลค้นหาที่กระจายเป็นหลายหมวดละ 1-2 รายการจะดูขาดๆ) โชว์เป็น grid เดียวแทน
@@ -52,8 +56,27 @@ export default async function ProductsPage({
     if (!isFreeOnly) freeToggleParams.set("free", "1");
     const freeToggleHref = `/products${freeToggleParams.toString() ? `?${freeToggleParams}` : ""}`;
 
+    // ItemList — บอก Google ว่าหน้านี้คือ "รายการสินค้า" พร้อมลำดับและลิงก์ของแต่ละชุด ช่วยให้เข้าใจ
+    // โครงสร้างหน้ารวมและไต่ไปเก็บหน้ารายละเอียดต่อได้เร็วขึ้น (ยังว่างอยู่ตราบใดที่ยังไม่มีสินค้า publish)
+    const jsonLd = {
+        "@context": "https://schema.org",
+        "@type": "ItemList",
+        name: "แนวข้อสอบทั้งหมด",
+        numberOfItems: products.length,
+        itemListElement: products.map((p, i) => ({
+            "@type": "ListItem",
+            position: i + 1,
+            name: p.prod_name,
+            url: `${SITE_URL}/products/${p.prod_id}`,
+        })),
+    };
+
     return (
         <div className="flex flex-col min-h-screen">
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
+            />
             <Navbar />
             <main className="flex-1 max-w-360 mx-auto w-full px-4 sm:px-6 py-10">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">

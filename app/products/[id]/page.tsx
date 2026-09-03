@@ -69,8 +69,20 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
         q.reveal.choice_reasons.some((r) => !r.is_correct && r.wrong_reason)
     );
 
+    // BreadcrumbList — ทำให้ผลค้นหาแสดงเส้นทาง "หน้าแรก > แนวข้อสอบทั้งหมด > ชื่อชุด" แทน URL ดิบ
+    // อ่านง่ายขึ้นและบอกโครงสร้างเว็บให้ Google ด้วย
+    const breadcrumbJsonLd = {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        itemListElement: [
+            { "@type": "ListItem", position: 1, name: "หน้าแรก", item: SITE_URL },
+            { "@type": "ListItem", position: 2, name: "แนวข้อสอบทั้งหมด", item: `${SITE_URL}/products` },
+            { "@type": "ListItem", position: 3, name: product.prod_name },
+        ],
+    };
+
     // structured data (schema.org Product) ให้ Google เอาไปแสดงราคา/สถานะพร้อมขายเป็น rich snippet ได้ —
-    // escape "<" กันกรณีชื่อ/คำอธิบายมีสตริง "</script>" หลุดมาปนแล้วตัด tag script ก่อนเวลา
+    // escape "<" ทั้ง 2 ก้อน กันกรณีชื่อ/คำอธิบายมีสตริง "</script>" หลุดมาปนแล้วตัด tag script ก่อนเวลา
     const jsonLd = {
         "@context": "https://schema.org",
         "@type": "Product",
@@ -91,6 +103,10 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
             <script
                 type="application/ld+json"
                 dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
+            />
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd).replace(/</g, "\\u003c") }}
             />
             <Navbar />
             <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-10">

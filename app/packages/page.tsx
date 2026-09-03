@@ -11,6 +11,7 @@ import BuyPackageButton from "./BuyPackageButton";
 export const metadata = {
     title: "แพ็กเกจสุดคุ้ม",
     description: "ซื้อแนวข้อสอบรวมชุดในราคาพิเศษ ประหยัดกว่าซื้อแยก พร้อมเฉลยละเอียดทีละขั้นตอนทุกชุด",
+    alternates: { canonical: "/packages" },
 };
 
 export default async function PackagesPage() {
