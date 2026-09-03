@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Kanit } from "next/font/google";
 import { Toaster } from "sonner";
 import OnboardingGate from "@/app/components/OnboardingGate";
@@ -36,6 +36,12 @@ export const metadata: Metadata = {
     title: DEFAULT_TITLE,
     description: DEFAULT_DESCRIPTION,
   },
+};
+
+// สีแถบ browser UI บนมือถือ (Chrome Android/Safari iOS) — ใช้น้ำเงินแบรนด์ตามที่ brand kit ล็อกไว้
+// ต้องอยู่ใน export ชื่อ `viewport` ไม่ใช่ metadata — Next ย้าย themeColor ออกจาก metadata ไปอยู่ viewport แล้ว
+export const viewport: Viewport = {
+  themeColor: "#2B5CE6",
 };
 
 export default async function RootLayout({

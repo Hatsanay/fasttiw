@@ -11,11 +11,13 @@ export const contentType = "image/png";
 // ต้องฝัง font Kanit เอง (satori เรนเดอร์ภาษาไทยไม่ได้ถ้าไม่ส่ง font ที่มี glyph ไทยเข้าไปตรงๆ
 // next/font/google ใช้กับ ImageResponse ไม่ได้ — โหลดไฟล์ .ttf จาก app/assets/ แทน)
 export default async function Image() {
-    const [kanit, icon] = await Promise.all([
+    const [kanit, logo] = await Promise.all([
         readFile(join(process.cwd(), "app/assets/Kanit-SemiBold.ttf")),
-        readFile(join(process.cwd(), "public/logo/icon-512.png")),
+        // ใช้ logo-dark (ตัวอักษร+วงสีขาว) เพราะพื้นหลังเป็นสีน้ำเงิน — โลโก้หลัก/ไอคอนเป็นน้ำเงินพื้นใส
+        // วางทับกันแล้วจะจมหายไปกับพื้น ส่วน lockup นี้มี wordmark อยู่ในตัวแล้ว จึงไม่ต้องพิมพ์ "Fasttiw" ซ้ำด้วย Kanit อีก
+        readFile(join(process.cwd(), "public/logo/fasttiw-logo-dark.png")),
     ]);
-    const iconSrc = `data:image/png;base64,${icon.toString("base64")}`;
+    const logoSrc = `data:image/png;base64,${logo.toString("base64")}`;
 
     return new ImageResponse(
         (
@@ -27,14 +29,13 @@ export default async function Image() {
                     flexDirection: "column",
                     alignItems: "center",
                     justifyContent: "center",
-                    background: "linear-gradient(135deg, #1d4ed8 0%, #2563eb 55%, #3b82f6 100%)",
+                    background: "linear-gradient(135deg, #1D3FA8 0%, #2B5CE6 55%, #5C86F0 100%)",
                     fontFamily: "Kanit",
                 }}
             >
                 {/* eslint-disable-next-line @next/next/no-img-element -- ImageResponse (Satori) ต้องใช้ <img> ธรรมดา ใช้ next/image ไม่ได้ */}
-                <img src={iconSrc} width={96} height={96} style={{ marginBottom: 32 }} alt="" />
-                <div style={{ display: "flex", fontSize: 72, fontWeight: 600, color: "white" }}>Fasttiw</div>
-                <div style={{ display: "flex", fontSize: 32, color: "rgba(255,255,255,0.9)", marginTop: 16 }}>
+                <img src={logoSrc} width={620} height={191} alt="" />
+                <div style={{ display: "flex", fontSize: 32, color: "rgba(255,255,255,0.9)", marginTop: 40 }}>
                     แนวข้อสอบออนไลน์พร้อมเฉลยละเอียด
                 </div>
             </div>

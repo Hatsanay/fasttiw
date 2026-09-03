@@ -24,7 +24,7 @@ export default function Footer() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-8">
                     <div className="sm:col-span-2 md:col-span-3 lg:col-span-2">
                         <Link href="/" className="flex items-center gap-2 font-semibold text-slate-800">
-                            <Image src="/logo/favicon.svg" alt="Fasttiw" width={32} height={32} className="shrink-0" />
+                            <Image src="/logo/fasttiw-symbol.svg" alt="Fasttiw" width={32} height={32} className="shrink-0" />
                             Fasttiw
                         </Link>
                         <p className="mt-3 text-sm text-slate-500 leading-relaxed max-w-xs">

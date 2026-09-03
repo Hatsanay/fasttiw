@@ -59,4 +59,11 @@
 
 ## Design system
 
+**Brand assets (kit ล่าสุด ชุดมีขา tt อัปเดต 2026-09-04)** — ต้นฉบับ brand kit อยู่ที่ `brand/` (นอก `public/` จะไม่ถูก serve ออกเว็บ) คู่กันกับฝั่งแอดมิน (`frontend/brand/`) สำเนาที่ใช้จริงอยู่ใน `public/logo/` + `app/{favicon.ico,icon.svg,apple-icon.png}` — สีแบรนด์น้ำเงิน `#2B5CE6` ส้ม `#FF9F1C` (ตั้งเป็น `--color-brand-600` กับ `themeColor` ใน `app/layout.tsx` แล้ว)
+
+- **สัดส่วนโลโก้แนวนอน = 496:153 (3.24:1)** brand kit ห้ามยืดสัดส่วน — `next/image` ทุกจุดค่า `width`/`height` ต้องตรงสัดส่วนนี้ (ที่ใช้อยู่: 130×40 ใน navbar, 130×40 กับ 91×28 ใน sidebar แอดมิน) — kit ปรับสัดส่วนมาแล้ว 3 รอบ (2.45 → 3.62 → 3.1 → 3.24) เปลี่ยนทีไรเช็ค viewBox ก่อนทุกครั้ง
+- **แท็บเบราว์เซอร์ใช้ `favicon-simple`** (`app/favicon.ico`, `app/icon.svg`) เพราะไอคอนหลักที่มีขา tt พอย่อเหลือ 16px ขาจะเละเป็นก้อน (README ของ kit เตือนไว้เอง) — ไอคอนขนาดใหญ่ (apple-touch, 192, 512, maskable) ยังใช้ตัวเต็มที่มีขา
+- สัญลักษณ์เดี่ยวๆ ใน UI ให้ใช้ `/logo/fasttiw-symbol.svg` (ไม่ใช่ไฟล์ favicon ตรงๆ) — kit นี้เลิกชื่อ `fasttiw-mark` แล้ว มีโลโก้แนวตั้ง (`fasttiw-logo-vertical*`) เพิ่มมาด้วย สำหรับพื้นที่ทรงจัตุรัส/แนวตั้ง
+- มี `app/manifest.ts` (PWA icon/ชื่อ/สี ตอนเพิ่มลงหน้าจอโฮม) และลายน้ำ PDF (`public/logo/watermark.png` → `watermark-tiled.png`) — **เปลี่ยนโลโก้อีกครั้งต้อง resize โลโก้ใหม่เป็น `watermark.png` (กว้าง 300px) แก้ `TILE_H` ให้ตรงสัดส่วน แล้วรัน `node scripts/build-tiled-watermark.mjs` ซ้ำ**
+
 `components/ui/` เป็นชุดใหม่ (ไม่ได้ก็อปจาก `tiwwai/frontend`) — Button ใช้ `cn()` (clsx + tailwind-merge) merge className ถูกต้อง (โปรเจกต์แอดมินมีบั๊กตรงนี้ อย่าทำซ้ำ) โทนสีกำหนดใน `app/globals.css` ผ่าน `--color-brand-*` (Tailwind v4 CSS-first config) ฟอนต์ใช้ Kanit จาก `next/font/google` (หลาย weight ต่างจากแอดมินที่มีแค่ regular ตัวเดียว)
