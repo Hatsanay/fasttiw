@@ -22,14 +22,14 @@ export default async function Navbar() {
                         <MobileNav session={!!session} fullName={fullName} avatarUrl={avatarUrl} />
                     </div>
                     <Link href={session ? "/library" : "/"} className="flex items-center">
-                        {/* สัดส่วนโลโก้ชุดนี้คือ 496:153 (3.24:1) — width/height ต้องตรงสัดส่วนนี้เสมอ (brand kit ห้ามยืดสัดส่วน)
+                        {/* สัดส่วนโลโก้ชุดนี้คือ 496:140 (3.54:1) — width/height ต้องตรงสัดส่วนนี้เสมอ (brand kit ห้ามยืดสัดส่วน)
                             clamp คำนวณจากสัดส่วนใหม่เพื่อให้ความสูงที่ตาเห็นใน navbar เท่าเดิม (29px → 41px → 45px ตามความกว้างจอ) */}
                         <Image
                             src="/logo/fasttiw-logo.svg"
                             alt="Fasttiw"
-                            width={130}
+                            width={142}
                             height={40}
-                            className="h-auto w-[clamp(95px,8vw+52px,146px)] shrink-0"
+                            className="h-auto w-[clamp(104px,8.7vw+57px,160px)] shrink-0"
                         />
                     </Link>
                 </div>
