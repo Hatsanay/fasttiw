@@ -1,38 +1,11 @@
 "use server";
 
-import { authorizedFetch, setSessionCookie } from "@/lib/session";
+import { authorizedFetch } from "@/lib/session";
 
-export type OnboardingState = { error?: string; success?: boolean } | undefined;
-
-// commit เดียวจบ (รหัสผ่านใหม่ + ข้อมูลส่วนตัว) — ตั้งใจไม่แยก endpoint กันเคสเปลี่ยนรหัสสำเร็จแล้ว
-// แต่ปิดเบราว์เซอร์ก่อนกรอกข้อมูลจะได้ไม่ค้างสถานะครึ่งๆ กลางๆ (ดู completeOnboarding ฝั่ง backend)
-export async function completeOnboardingAction(_prevState: OnboardingState, formData: FormData): Promise<OnboardingState> {
-    const new_password = String(formData.get("new_password") ?? "");
-    const cus_fname = String(formData.get("cus_fname") ?? "").trim();
-    const cus_lname = String(formData.get("cus_lname") ?? "").trim();
-    const cus_email = String(formData.get("cus_email") ?? "").trim();
-    const cus_phone = String(formData.get("cus_phone") ?? "").trim();
-    const pdpa_consent = formData.get("pdpa_consent") === "on";
-
-    if (!pdpa_consent) {
-        return { error: "กรุณายอมรับนโยบายความเป็นส่วนตัวก่อนใช้งาน" };
-    }
-
-    const res = await authorizedFetch("/store/me/onboarding", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ new_password, cus_fname, cus_lname, cus_email, cus_phone: cus_phone || null, pdpa_consent }),
-    });
-    const data = await res.json().catch(() => ({}));
-
-    if (!res.ok) {
-        return { error: data.message ?? "บันทึกไม่สำเร็จ กรุณาลองใหม่" };
-    }
-
-    // ได้ token ใหม่ที่ mcp เป็น false แล้ว มาตั้งทับ cookie เดิม
-    await setSessionCookie(data.token);
-    return { success: true };
-}
+// onboarding ย้ายไปเป็น Route Handler ที่ `app/api/auth/onboarding/route.ts` แล้ว (2026-09-04)
+// เพราะ WAF ของโฮสต์ตอบ 403 ให้ทุก request ที่มีสตริง `$@` ซึ่ง Next แนบมากับฟอร์มที่ผูก useActionState
+// เสมอ — ด่าน onboarding เป็นด่านแรกของลูกค้าที่แอดมินสร้างบัญชีให้ ถ้าติดคือเข้าใช้เว็บไม่ได้เลย
+// (ดูรายละเอียดที่ CLAUDE.md หัวข้อ Session/Auth pattern)
 
 export type ProfileState = { error?: string; success?: boolean } | undefined;
 

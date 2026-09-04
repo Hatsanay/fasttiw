@@ -6,6 +6,7 @@ import { CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
+import { postJson } from "@/lib/http";
 
 type FormErrors = { password?: string; confirm?: string };
 
@@ -32,23 +33,13 @@ export default function ResetPasswordForm({ token }: { token: string }) {
         }
 
         setPending(true);
-        try {
-            const res = await fetch("/api/auth/reset-password", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ token, new_password: password }),
-            });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) {
-                toast.error(data.message ?? "ตั้งรหัสผ่านใหม่ไม่สำเร็จ กรุณาลองใหม่");
-                return;
-            }
-            setSuccessMessage(data.message ?? "ตั้งรหัสผ่านใหม่เรียบร้อยแล้ว");
-        } catch {
-            toast.error("เชื่อมต่อไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
-        } finally {
-            setPending(false);
+        const res = await postJson("/api/auth/reset-password", { token, new_password: password });
+        setPending(false);
+        if (!res.ok) {
+            toast.error(res.message ?? "ตั้งรหัสผ่านใหม่ไม่สำเร็จ กรุณาลองใหม่");
+            return;
         }
+        setSuccessMessage(res.message ?? "ตั้งรหัสผ่านใหม่เรียบร้อยแล้ว");
     }
 
     if (successMessage) {

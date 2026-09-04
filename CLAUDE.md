@@ -9,6 +9,7 @@
 **เสร็จแล้ว** (MVP phase 1-6 + phase 2 เกือบครบทั้งหมดตาม `../CLAUDE.md`):
 - landing page (`Hero.tsx` สลับ 11 มุมมองข้อความ+รูปคู่กันอัตโนมัติ), แคตตาล็อกสินค้า (`/products`), หน้ารายละเอียดสินค้า (`/products/[id]` + ลิงก์ตัวอย่างฟรี), ตะกร้าสินค้าฝั่ง client (`/cart`, localStorage)
 - สมัคร/เข้าสู่ระบบ (`/register`, `/login`) + onboarding บังคับเปลี่ยนรหัส/เติมข้อมูล+รูปโปรไฟล์+ยอมรับนโยบายความเป็นส่วนตัว (`OnboardingGate`/`OnboardingModal`)
+- **ยืนยันอีเมลด้วย OTP ตอนสมัคร** (2026-09-04): หน้า `/register` เป็น 2 ขั้น — กรอกข้อมูล → กรอกรหัส 6 หลักที่ส่งไปทางอีเมล (มีปุ่มส่งใหม่พร้อมนับถอยหลัง 60 วิ) บัญชีถูกสร้างก็ต่อเมื่อกรอกรหัสถูก ดูกติกาเต็มที่ `../CLAUDE.md` ข้อ 6.4
 - เช็คเอาท์จริง (`/cart` หรือ `/packages` → checkout → `/orders/[id]` ใบเสร็จ) พร้อมชำระเงินจริงผ่าน **Stripe PromptPay** (ย้ายมาจาก Omise ระหว่างทำโปรเจกต์ — ดู `../CLAUDE.md` ข้อ 6) — สร้าง QR ให้สแกนตอน checkout เลย, หน้า order poll สถานะเองทุก 4 วิ (`OrderStatusPoller.tsx` + Route Handler แรกของโปรเจกต์ `app/api/orders/[id]/status/route.ts`) จนกว่า webhook จะยืนยัน, แสดงสถานะ pending/paid/cancelled ชัดเจน, ยกเลิกคำสั่งซื้อที่ยังไม่จ่ายได้เอง (`CancelOrderButton.tsx` ที่หน้า order เดียวกัน)
 - **ทำข้อสอบจริง**: `/library` → `/exam/[productId]` (เลือกโหมด) → `/exam/attempts/[id]` (ทำทีละข้อ, autosave, timer, auto-submit) → `/exam/attempts/[id]/review` (เฉลยครบ 4 อย่าง + bookmark + แจ้งปัญหาข้อนี้) — รองรับรูปภาพประกอบโจทย์ทุกจุด (`QuestionImage.tsx`) และรูปภาพต่อตัวเลือก (`ChoiceImage.tsx`, ใช้ใน exam runner/review/bookmarks/sample ทุกจุด)
 - **ประวัติ/bookmark/บัญชี**: `/history` (+ สรุปจุดอ่อนรายหมวด), `/bookmarks` (+ แจ้งปัญหาข้อนี้), `/account` (โปรไฟล์/รหัสผ่าน/รูป/อุปกรณ์ที่ล็อกอิน/ขอลบข้อมูลบัญชี)
@@ -33,7 +34,7 @@
 
 ## Backend endpoints ที่ใช้ (`/api/V1/store/...`)
 
-- Public: `GET /store/products`, `GET /store/products/:id`, `GET /store/products/:id/sample-questions`, `GET /store/packages`, `POST /store/auth/forgot-password`, `POST /store/auth/reset-password`, `POST /store/webhooks/payment` (webhook จาก Stripe จริง — verify signature ผ่าน SDK ทางการ `stripe.webhooks.constructEvent()` แล้ว)
+- Public: `GET /store/products`, `GET /store/products/:id`, `GET /store/products/:id/sample-questions`, `GET /store/packages`, `POST /store/auth/register/request-otp` (ขอรหัส OTP ยืนยันอีเมลก่อนสมัคร), `POST /store/auth/forgot-password`, `POST /store/auth/reset-password`, `POST /store/webhooks/payment` (webhook จาก Stripe จริง — verify signature ผ่าน SDK ทางการ `stripe.webhooks.constructEvent()` แล้ว)
 - ต้อง auth (`Authorization: Bearer <customer JWT>`, payload `{ cus_id, mcp, jti }` — `jti` ใหม่จาก phase จำกัดอุปกรณ์):
   - Auth/onboarding: `POST /store/auth/register`, `POST /store/auth/login`, `GET /store/me`, `PUT /store/me`, `PUT /store/me/password`, `PUT /store/me/onboarding`, `PUT /store/me/image`
   - Session: `GET /store/me/sessions` (รายการอุปกรณ์), `DELETE /store/me/sessions/:id` (เตะอุปกรณ์อื่น)
@@ -48,6 +49,12 @@
 - entitlement จากการซื้อผ่านลูกค้าเอง (checkout/webhook) ใช้ `grantOrRenewProduct()` (ต่ออายุถ้ามีสิทธิ์ active อยู่แล้ว ไม่สร้างซ้ำ) ต่างจาก `grantProduct()` ที่แอดมิน grant มือ (ตั้งใจไม่ dedupe เพื่อความยืดหยุ่นของแอดมิน)
 
 ## Session/Auth pattern (implement แล้ว)
+
+**⚠ ฟอร์ม auth ทั้ง 5 ไม่ใช้ Server Action แล้ว (2026-09-04)** — `login`, `register`, `forgot-password`, `reset-password`, **`onboarding`** (รวมอัปโหลดรูปโปรไฟล์ตอน onboarding ที่ `/api/me/avatar`) ย้ายไปเป็น Route Handler ที่ `app/api/auth/*/route.ts` + ฟอร์มยิง `postJson()` จาก `lib/http.ts` เอง เพราะ **WAF ของโฮสต์ (ModSecurity rule React2Shell) ตอบ 403 ให้ทุก request ที่มีสตริง `$@`** ซึ่ง Next แนบมากับฟอร์มที่ผูก `useActionState` เสมอ (ช่องซ่อน `{"bound":"$@1"}` ไว้ใช้ตอน JS ยังไม่ hydrate) — ลูกค้าที่กดปุ่มก่อนหน้าเว็บพร้อมจะเจอหน้า error และงานไม่เกิดขึ้นจริง
+
+**cookie ยังตั้งฝั่ง server เหมือนเดิม** (Route Handler ตั้ง httpOnly cookie ได้เท่ากับ Server Action) JWT ไม่เคยผ่านมือ JS ฝั่ง client — กฎเดิมไม่เปลี่ยน · หลังตั้ง cookie เสร็จฟอร์มใช้ `hardNavigate()` (โหลดหน้าใหม่ทั้งหน้า) ไม่ใช่ `router.push` เพื่อให้ Server Component ทุกตัว render ใหม่ด้วย cookie ชุดใหม่
+
+**ที่ยังเหลือใช้ `useActionState` อยู่ 3 ตัว** คือ `account/{AvatarUpload,PasswordForm,ProfileForm}.tsx` — **ตัดสินใจแล้วว่าไม่ย้าย (2026-09-04)** เพราะอยู่หลัง login ทั้งหมด ล้มแบบปลอดภัย (ไม่มีข้อมูลเสีย ไม่มีเงินเกี่ยว) กด Back แล้วลองใหม่ก็ผ่านเพราะรอบสอง JS โหลดเสร็จแล้ว — ทางแก้ที่ถูกต้องกว่าคือให้โฮสต์ใส่ข้อยกเว้นกฎ WAF `1055182010` ให้โดเมนนี้ (อัป Next 16.3.3 แล้ว = ปิดช่องโหว่ที่กฎนั้นป้องกันไปแล้ว) **อย่าเสนอย้ายซ้ำถ้าไม่มีข้อมูลใหม่** · `logoutAction` ไม่ต้องย้าย เพราะไม่ได้ผูก `useActionState` จึงไม่มี `$@` ในฟอร์ม
 
 - httpOnly cookie เป็นแหล่งเก็บ JWT เดียว ตั้งค่าผ่าน Server Action ตอน login/register เท่านั้น — client-side JS ห้ามแตะ token
 - Server Component ที่ต้องใช้ auth (fetch ข้อมูลส่วนตัว) อ่าน cookie ผ่าน `cookies()` แล้วแนบ `Authorization` header เรียก backend ตรงๆ ได้เลย (ปลอดภัยเพราะรันฝั่ง server)

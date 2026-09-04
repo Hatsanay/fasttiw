@@ -5,6 +5,7 @@ import { MailCheck } from "lucide-react";
 import { toast } from "sonner";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
+import { postJson } from "@/lib/http";
 
 // ยิงผ่าน Route Handler (`/api/auth/forgot-password`) ด้วย fetch เอง ไม่ใช้ Server Action เหมือนฟอร์มอื่น
 // เพราะ WAF ของโฮสต์บล็อกสตริง `$@` ที่ Next ใส่มากับฟอร์ม Server Action — ดูคำอธิบายเต็มที่ route.ts
@@ -22,23 +23,13 @@ export default function ForgotPasswordForm() {
         }
 
         setPending(true);
-        try {
-            const res = await fetch("/api/auth/forgot-password", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ cus_email: email.trim() }),
-            });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) {
-                toast.error(data.message ?? "ขอลิงก์ไม่สำเร็จ กรุณาลองใหม่");
-                return;
-            }
-            setSentMessage(data.message ?? "ส่งลิงก์ไปที่อีเมลแล้ว");
-        } catch {
-            toast.error("เชื่อมต่อไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
-        } finally {
-            setPending(false);
+        const res = await postJson("/api/auth/forgot-password", { cus_email: email.trim() });
+        setPending(false);
+        if (!res.ok) {
+            toast.error(res.message ?? "ขอลิงก์ไม่สำเร็จ กรุณาลองใหม่");
+            return;
         }
+        setSentMessage(res.message ?? "ส่งลิงก์ไปที่อีเมลแล้ว");
     }
 
     // สำเร็จแล้วสลับเป็นหน้าจอ "ไปเช็คเมล" แทนที่จะโชว์ฟอร์มเดิมค้างไว้ — ข้อความมาจาก backend ตรงๆ

@@ -1,15 +1,14 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { KeyRound, UserRound } from "lucide-react";
 import Card from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import AvatarCrop from "@/components/ui/AvatarCrop";
-import { completeOnboardingAction, uploadAvatarAction, type OnboardingState } from "@/app/actions/account";
+import { postJson } from "@/lib/http";
 
 type Profile = { cus_fname: string | null; cus_lname: string | null; cus_email: string | null; cus_phone: string | null };
 
@@ -39,9 +38,12 @@ function validateProfile(fname: string, lname: string, email: string, phone: str
     return errors;
 }
 
+// ยิงผ่าน Route Handler (`/api/auth/onboarding` + `/api/me/avatar`) ไม่ใช้ Server Action — WAF ของโฮสต์
+// ตอบ 403 ให้ request ที่มีสตริง `$@` ซึ่ง Next แนบมากับฟอร์มที่ผูก useActionState เสมอ
+// ด่านนี้เป็นด่านแรกของลูกค้าที่แอดมินสร้างบัญชีให้ ถ้าติดคือใช้เว็บไม่ได้เลย (ดู app/api/auth/onboarding/route.ts)
 export default function OnboardingModal({ initialProfile }: { initialProfile: Profile }) {
-    const router = useRouter();
     const [step, setStep] = useState<1 | 2>(1);
+    const [pending, setPending] = useState(false);
     const [newPassword, setNewPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [passwordErrors, setPasswordErrors] = useState<PasswordErrors>({});
@@ -54,25 +56,41 @@ export default function OnboardingModal({ initialProfile }: { initialProfile: Pr
     const [pdpaConsent, setPdpaConsent] = useState(false);
     const [profileErrors, setProfileErrors] = useState<ProfileErrors>({});
 
-    const [state, action, pending] = useActionState<OnboardingState, FormData>(completeOnboardingAction, undefined);
+    async function submitOnboarding() {
+        setPending(true);
 
-    useEffect(() => {
-        if (state?.error) toast.error(state.error);
-        if (state?.success) {
-            (async () => {
-                // อัปโหลดรูปแยกจาก onboarding หลัก เพราะ endpoint หลักรับ JSON ส่วนรูปต้องเป็น multipart —
-                // ทำต่อหลัง onboarding สำเร็จเลย ไม่บังคับผู้ใช้ต้องมาอัปโหลดซ้ำที่หน้าบัญชีทีหลัง
-                if (avatarFile) {
-                    const fd = new FormData();
-                    fd.append("image", avatarFile);
-                    const avatarResult = await uploadAvatarAction(undefined, fd);
-                    if (avatarResult?.error) toast.error(avatarResult.error);
-                }
-                toast.success("บันทึกข้อมูลสำเร็จ");
-                router.refresh(); // ให้ RootLayout ประเมิน session ใหม่ — mcp เป็น false แล้ว modal จะหายไปเอง
-            })();
+        const res = await postJson("/api/auth/onboarding", {
+            new_password: newPassword,
+            cus_fname: fname.trim(),
+            cus_lname: lname.trim(),
+            cus_email: email.trim(),
+            cus_phone: phone.trim(),
+            pdpa_consent: pdpaConsent,
+        });
+        if (!res.ok) {
+            toast.error(res.message ?? "บันทึกไม่สำเร็จ กรุณาลองใหม่");
+            setPending(false);
+            return;
         }
-    }, [state, router, avatarFile]);
+
+        // อัปโหลดรูปแยกจาก onboarding หลัก เพราะ endpoint หลักรับ JSON ส่วนรูปต้องเป็น multipart —
+        // ทำต่อเลยหลังบันทึกข้อมูลหลักสำเร็จ ไม่บังคับให้ไปอัปโหลดซ้ำที่หน้าบัญชีทีหลัง
+        // รูปอัปไม่สำเร็จ ไม่ถือว่า onboarding ล้มเหลว — ข้อมูลหลักบันทึกไปแล้ว ค่อยเปลี่ยนรูปทีหลังก็ได้
+        if (avatarFile) {
+            const fd = new FormData();
+            fd.append("image", avatarFile);
+            const avatarRes = await fetch("/api/me/avatar", { method: "PUT", body: fd });
+            if (!avatarRes.ok) {
+                const data = await avatarRes.json().catch(() => ({}));
+                toast.error(data.message ?? "อัปโหลดรูปไม่สำเร็จ เปลี่ยนได้ทีหลังที่หน้าบัญชี");
+            }
+        }
+
+        toast.success("บันทึกข้อมูลสำเร็จ");
+        // โหลดหน้าใหม่ทั้งหน้า (ไม่ใช่ router.refresh) เพราะเพิ่งตั้ง cookie ชุดใหม่ที่ mcp = false
+        // ต้องให้ Server Component ทุกตัว render ใหม่ด้วย cookie ชุดใหม่ modal จึงจะหายไปแน่นอน
+        window.location.reload();
+    }
 
     function handleNewPasswordChange(e: React.ChangeEvent<HTMLInputElement>) {
         setNewPassword(e.target.value);
@@ -117,11 +135,13 @@ export default function OnboardingModal({ initialProfile }: { initialProfile: Pr
     }
 
     function handleProfileSubmit(e: React.FormEvent<HTMLFormElement>) {
+        e.preventDefault();
         const fieldErrors = validateProfile(fname, lname, email, phone, pdpaConsent);
         if (Object.keys(fieldErrors).length > 0) {
-            e.preventDefault();
             setProfileErrors(fieldErrors);
+            return;
         }
+        submitOnboarding();
     }
 
     return (
@@ -159,8 +179,7 @@ export default function OnboardingModal({ initialProfile }: { initialProfile: Pr
                         </Button>
                     </form>
                 ) : (
-                    <form action={action} onSubmit={handleProfileSubmit} className="flex flex-col gap-4">
-                        <input type="hidden" name="new_password" value={newPassword} />
+                    <form onSubmit={handleProfileSubmit} className="flex flex-col gap-4">
                         <div className="flex flex-col items-center text-center gap-2 mb-2">
                             <span className="flex h-11 w-11 items-center justify-center rounded-full bg-brand-50 text-brand-600">
                                 <UserRound size={20} />
