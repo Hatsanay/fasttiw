@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { setSessionCookie, clearSessionCookie, authorizedFetch } from "@/lib/session";
+import { forwardedClientHeaders } from "@/lib/clientIp";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3003/api/V1";
 
@@ -24,7 +25,8 @@ export async function loginAction(_prevState: AuthFormState, formData: FormData)
 
     const res = await fetch(`${API_URL}/store/auth/login`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        // แนบ IP จริงของผู้ใช้ไปให้ rate limit ฝั่ง backend (กันเดารหัสผ่านรัวๆ) — ดู lib/clientIp.ts
+        headers: { "Content-Type": "application/json", ...(await forwardedClientHeaders()) },
         body: JSON.stringify({ cus_username, cus_password }),
     });
     const data = await res.json().catch(() => ({}));
@@ -58,7 +60,7 @@ export async function registerAction(_prevState: AuthFormState, formData: FormDa
 
     const res = await fetch(`${API_URL}/store/auth/register`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(await forwardedClientHeaders()) },
         body: JSON.stringify({ cus_username, cus_email, cus_password, cus_fname, cus_lname, pdpa_consent }),
     });
     const data = await res.json().catch(() => ({}));
@@ -81,43 +83,7 @@ export async function logoutAction() {
 }
 
 // ── ลืมรหัสผ่าน ───────────────────────────────────────────────────────────────
-// ต่างจาก AuthFormState ตรงที่มีสถานะ "สำเร็จ" ด้วย เพราะ 2 ฟอร์มนี้ไม่ได้ redirect ไปไหนทันที
-// (ขอลิงก์แล้วต้องบอกให้ไปเช็คเมล / ตั้งรหัสใหม่เสร็จแล้วค่อยให้กดไปหน้าเข้าสู่ระบบเอง)
-export type MessageFormState = { error?: string; success?: string } | undefined;
-
-export async function forgotPasswordAction(_prevState: MessageFormState, formData: FormData): Promise<MessageFormState> {
-    const cus_email = String(formData.get("cus_email") ?? "").trim();
-    if (!cus_email) return { error: "กรุณากรอกอีเมล" };
-
-    const res = await fetch(`${API_URL}/store/auth/forgot-password`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cus_email }),
-    });
-    const data = await res.json().catch(() => ({}));
-
-    if (!res.ok) return { error: data.message ?? "ขอลิงก์ไม่สำเร็จ กรุณาลองใหม่" };
-    // backend ตอบข้อความเดียวกันเสมอไม่ว่าอีเมลนั้นจะมีบัญชีจริงหรือไม่ (กันคนไล่เดาว่าอีเมลไหนเป็นลูกค้าเรา)
-    // ฝั่งนี้จึงส่งต่อข้อความนั้นตรงๆ ห้ามเติมเงื่อนไขเองว่าเจอ/ไม่เจอบัญชี
-    return { success: data.message ?? "ส่งลิงก์ไปที่อีเมลแล้ว" };
-}
-
-export async function resetPasswordAction(_prevState: MessageFormState, formData: FormData): Promise<MessageFormState> {
-    const token = String(formData.get("token") ?? "");
-    const new_password = String(formData.get("new_password") ?? "");
-    const confirm_password = String(formData.get("confirm_password") ?? "");
-
-    if (!token) return { error: "ลิงก์ไม่ถูกต้อง กรุณาขอลิงก์ใหม่อีกครั้ง" };
-    if (new_password.length < 8) return { error: "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร" };
-    if (new_password !== confirm_password) return { error: "รหัสผ่านทั้งสองช่องไม่ตรงกัน" };
-
-    const res = await fetch(`${API_URL}/store/auth/reset-password`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, new_password }),
-    });
-    const data = await res.json().catch(() => ({}));
-
-    if (!res.ok) return { error: data.message ?? "ตั้งรหัสผ่านใหม่ไม่สำเร็จ กรุณาลองใหม่" };
-    return { success: data.message ?? "ตั้งรหัสผ่านใหม่เรียบร้อยแล้ว" };
-}
+// 2 flow นี้ **ไม่ได้อยู่ที่นี่** — ย้ายไปเป็น Route Handler ที่ `app/api/auth/{forgot,reset}-password/route.ts`
+// เพราะ WAF ของโฮสต์ (ModSecurity) ตอบ 403 ให้ทุก request ที่มีสตริง `$@` ซึ่ง Next แนบมากับฟอร์ม
+// Server Action ทุกหน้า ทำให้ลูกค้าที่กดตั้งรหัสผ่านใหม่เจอหน้า error และรหัสไม่ถูกเปลี่ยนจริง
+// (ยืนยันบน production แล้ว 2026-09-04 — ดู CLAUDE.md ข้อ 6.2)

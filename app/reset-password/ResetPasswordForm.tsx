@@ -1,44 +1,63 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
-import { resetPasswordAction, type MessageFormState } from "@/app/actions/auth";
 
 type FormErrors = { password?: string; confirm?: string };
 
+// ยิงผ่าน Route Handler (`/api/auth/reset-password`) ไม่ใช้ Server Action — ดูเหตุผลที่ route.ts
+// (WAF ของโฮสต์ตอบ 403 ให้ทุก request ที่มีสตริง `$@` ซึ่ง Next แนบมากับฟอร์ม Server Action)
 export default function ResetPasswordForm({ token }: { token: string }) {
-    const [state, action, pending] = useActionState<MessageFormState, FormData>(resetPasswordAction, undefined);
     const [password, setPassword] = useState("");
     const [confirm, setConfirm] = useState("");
     const [errors, setErrors] = useState<FormErrors>({});
+    const [pending, setPending] = useState(false);
+    const [successMessage, setSuccessMessage] = useState<string>();
 
-    useEffect(() => {
-        if (state?.error) toast.error(state.error);
-    }, [state]);
+    async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+        e.preventDefault();
 
-    // ตรวจฝั่ง client ก่อนยิง server action (รูปแบบเดียวกับ LoginForm) — เงื่อนไขเดียวกันนี้ backend
-    // ตรวจซ้ำอีกชั้นเสมอ ตรงนี้แค่ช่วยให้ผู้ใช้รู้ผลทันทีโดยไม่ต้องรอ round-trip
-    function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+        // เช็คฝั่ง client ก่อนเพื่อให้รู้ผลทันทีโดยไม่ต้องรอ round-trip — เงื่อนไขเดียวกันนี้
+        // ทั้ง Route Handler และ backend ตรวจซ้ำอีกชั้นเสมอ
         const fieldErrors: FormErrors = {};
         if (password.length < 8) fieldErrors.password = "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร";
         if (confirm !== password) fieldErrors.confirm = "รหัสผ่านทั้งสองช่องไม่ตรงกัน";
         if (Object.keys(fieldErrors).length > 0) {
-            e.preventDefault();
             setErrors(fieldErrors);
+            return;
+        }
+
+        setPending(true);
+        try {
+            const res = await fetch("/api/auth/reset-password", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ token, new_password: password }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                toast.error(data.message ?? "ตั้งรหัสผ่านใหม่ไม่สำเร็จ กรุณาลองใหม่");
+                return;
+            }
+            setSuccessMessage(data.message ?? "ตั้งรหัสผ่านใหม่เรียบร้อยแล้ว");
+        } catch {
+            toast.error("เชื่อมต่อไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+        } finally {
+            setPending(false);
         }
     }
 
-    if (state?.success) {
+    if (successMessage) {
         return (
             <div className="flex flex-col items-center text-center gap-3 py-2">
                 <span className="flex h-12 w-12 items-center justify-center rounded-full bg-green-50 text-green-600">
                     <CheckCircle2 size={22} />
                 </span>
-                <p className="text-sm text-slate-600 leading-relaxed">{state.success}</p>
+                <p className="text-sm text-slate-600 leading-relaxed">{successMessage}</p>
                 <Link href="/login" className="w-full">
                     <Button size="lg" className="w-full mt-1">เข้าสู่ระบบ</Button>
                 </Link>
@@ -47,9 +66,7 @@ export default function ResetPasswordForm({ token }: { token: string }) {
     }
 
     return (
-        <form action={action} onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <input type="hidden" name="token" value={token} />
-
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
                 <label className="text-sm font-medium text-slate-700">รหัสผ่านใหม่</label>
                 <Input
