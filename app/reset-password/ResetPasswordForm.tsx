@@ -1,0 +1,93 @@
+"use client";
+
+import { useActionState, useEffect, useState } from "react";
+import Link from "next/link";
+import { CheckCircle2 } from "lucide-react";
+import { toast } from "sonner";
+import Input from "@/components/ui/Input";
+import Button from "@/components/ui/Button";
+import { resetPasswordAction, type MessageFormState } from "@/app/actions/auth";
+
+type FormErrors = { password?: string; confirm?: string };
+
+export default function ResetPasswordForm({ token }: { token: string }) {
+    const [state, action, pending] = useActionState<MessageFormState, FormData>(resetPasswordAction, undefined);
+    const [password, setPassword] = useState("");
+    const [confirm, setConfirm] = useState("");
+    const [errors, setErrors] = useState<FormErrors>({});
+
+    useEffect(() => {
+        if (state?.error) toast.error(state.error);
+    }, [state]);
+
+    // ตรวจฝั่ง client ก่อนยิง server action (รูปแบบเดียวกับ LoginForm) — เงื่อนไขเดียวกันนี้ backend
+    // ตรวจซ้ำอีกชั้นเสมอ ตรงนี้แค่ช่วยให้ผู้ใช้รู้ผลทันทีโดยไม่ต้องรอ round-trip
+    function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+        const fieldErrors: FormErrors = {};
+        if (password.length < 8) fieldErrors.password = "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร";
+        if (confirm !== password) fieldErrors.confirm = "รหัสผ่านทั้งสองช่องไม่ตรงกัน";
+        if (Object.keys(fieldErrors).length > 0) {
+            e.preventDefault();
+            setErrors(fieldErrors);
+        }
+    }
+
+    if (state?.success) {
+        return (
+            <div className="flex flex-col items-center text-center gap-3 py-2">
+                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-green-50 text-green-600">
+                    <CheckCircle2 size={22} />
+                </span>
+                <p className="text-sm text-slate-600 leading-relaxed">{state.success}</p>
+                <Link href="/login" className="w-full">
+                    <Button size="lg" className="w-full mt-1">เข้าสู่ระบบ</Button>
+                </Link>
+            </div>
+        );
+    }
+
+    return (
+        <form action={action} onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <input type="hidden" name="token" value={token} />
+
+            <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-slate-700">รหัสผ่านใหม่</label>
+                <Input
+                    name="new_password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => {
+                        setPassword(e.target.value);
+                        if (errors.password) setErrors((prev) => ({ ...prev, password: undefined }));
+                    }}
+                    error={!!errors.password}
+                    autoFocus
+                />
+                {errors.password ? (
+                    <p className="text-xs text-red-500">{errors.password}</p>
+                ) : (
+                    <p className="text-xs text-slate-400">อย่างน้อย 8 ตัวอักษร</p>
+                )}
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-slate-700">ยืนยันรหัสผ่านใหม่</label>
+                <Input
+                    name="confirm_password"
+                    type="password"
+                    value={confirm}
+                    onChange={(e) => {
+                        setConfirm(e.target.value);
+                        if (errors.confirm) setErrors((prev) => ({ ...prev, confirm: undefined }));
+                    }}
+                    error={!!errors.confirm}
+                />
+                {errors.confirm && <p className="text-xs text-red-500">{errors.confirm}</p>}
+            </div>
+
+            <Button type="submit" size="lg" disabled={pending} className="mt-1">
+                {pending ? "กำลังบันทึก..." : "บันทึกรหัสผ่านใหม่"}
+            </Button>
+        </form>
+    );
+}

@@ -66,6 +66,12 @@ export default function LoginForm({ next }: { next: string }) {
                 {pending ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ"}
             </Button>
 
+            <p className="text-center text-sm">
+                <Link href="/forgot-password" className="text-slate-500 hover:text-brand-600 transition-colors">
+                    ลืมรหัสผ่าน?
+                </Link>
+            </p>
+
             <p className="text-center text-sm text-slate-500">
                 ยังไม่มีบัญชี?{" "}
                 <Link href={`/register?next=${encodeURIComponent(next)}`} className="font-medium text-brand-600 hover:text-brand-700">

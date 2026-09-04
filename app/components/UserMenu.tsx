@@ -3,12 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { User, Settings, LogOut, ChevronDown } from "lucide-react";
+import { User, LogOut, ChevronDown } from "lucide-react";
 import { logoutAction } from "@/app/actions/auth";
+import { ACCOUNT_LINKS } from "./navLinks";
 
-// คลังข้อสอบ/ประวัติ/bookmark ย้ายไปแสดงเป็นลิงก์หลักใน Navbar แล้ว (ดู navLinks.ts) เหลือแค่
-// บัญชี+ออกจากระบบ ใน dropdown นี้ ไม่ต้องซ้ำกับที่โชว์อยู่แล้ว
-const LINKS = [{ href: "/account", label: "บัญชีของฉัน", icon: Settings }];
+// คลังข้อสอบ/ประวัติ/bookmark ย้ายไปแสดงเป็นลิงก์หลักใน Navbar แล้ว (ดู navLinks.ts) เหลือแค่กลุ่ม
+// บัญชี (คำสั่งซื้อ + บัญชีของฉัน) กับออกจากระบบ ใน dropdown นี้ ไม่ต้องซ้ำกับที่โชว์อยู่แล้ว —
+// รายการเดียวกันนี้ MobileNav ก็ใช้ต่อ จึงเก็บไว้ที่ navLinks.ts ที่เดียว
+const LINKS = ACCOUNT_LINKS;
 
 export default function UserMenu({ fullName, avatarUrl }: { fullName: string | null; avatarUrl: string | null }) {
     const [open, setOpen] = useState(false);

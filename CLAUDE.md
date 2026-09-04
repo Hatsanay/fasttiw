@@ -16,6 +16,9 @@
 - **แพ็กเกจรวมชุด**: `/packages` (ซื้อรวมราคาพิเศษ, ซื้อซ้ำ product ที่มีอยู่แล้ว → ต่ออายุ ไม่สร้างสิทธิ์ซ้ำ, การ์ดมีรูปหน้าปกแพ็กเกจ `pkg_cover_url`)
 - **จำกัด 2 อุปกรณ์ล็อกอินพร้อมกัน** ต่อบัญชี (กันแชร์บัญชี — ความเสี่ยงอันดับ 1 ตาม `../CLAUDE.md` ข้อ 7) จัดการที่ `/account`
 - **PDPA**: `/privacy`, checkbox ยอมรับตอนสมัคร/onboarding, ปุ่มขอลบข้อมูลบัญชีที่ `/account`
+- **ลืมรหัสผ่านเองได้** (2026-09-04): `/forgot-password` → รับลิงก์ทางอีเมล → `/reset-password?token=...` (หน้านี้ `robots: noindex` เพราะ token อยู่ใน URL) — ดูกติกาความปลอดภัยเต็มๆ ที่ `../CLAUDE.md` ข้อ 6.2
+- **คำสั่งซื้อของฉัน** (2026-09-04): `/orders` รายการออเดอร์ทั้งหมดพร้อมสถานะ/ชื่อชุดข้อสอบ/ยอดเงิน กดเข้าไปดูใบเสร็จหรือจ่ายเงินที่ค้างต่อได้ — เดิมมีแต่หน้าออเดอร์รายใบ ปิดแท็บทิ้งแล้วหาไม่เจอ
+- **ใบเสร็จส่งเข้าอีเมลอัตโนมัติ** หลังชำระเงินสำเร็จ (ดู `../CLAUDE.md` ข้อ 6.1)
 - **Navbar/UserMenu**: แสดงชื่อเต็ม+รูปโปรไฟล์, responsive (`md:` ขึ้นไปโชว์ลิงก์ตรงๆ, ต่ำกว่านั้นพับเป็น sidebar เลื่อนจากซ้าย `MobileNav.tsx`)
 
 **ยังไม่ทำ**: package กับ coupon ใช้พร้อมกันไม่ได้ (v1 จำกัดไว้) — payment gateway เชื่อม Stripe ครบแล้วและ**ยืนยัน live mode ใช้งานได้จริงบน production แล้ว** (2026-08-17: ตั้ง webhook endpoint จริง, ทดสอบจ่ายเงินจริงผ่าน PromptPay สำเร็จ ให้สิทธิ์ถูกต้อง) ดูหัวข้อ 6 ที่ `../CLAUDE.md`
@@ -30,12 +33,12 @@
 
 ## Backend endpoints ที่ใช้ (`/api/V1/store/...`)
 
-- Public: `GET /store/products`, `GET /store/products/:id`, `GET /store/products/:id/sample-questions`, `GET /store/packages`, `POST /store/webhooks/payment` (webhook จาก Stripe จริง — verify signature ผ่าน SDK ทางการ `stripe.webhooks.constructEvent()` แล้ว)
+- Public: `GET /store/products`, `GET /store/products/:id`, `GET /store/products/:id/sample-questions`, `GET /store/packages`, `POST /store/auth/forgot-password`, `POST /store/auth/reset-password`, `POST /store/webhooks/payment` (webhook จาก Stripe จริง — verify signature ผ่าน SDK ทางการ `stripe.webhooks.constructEvent()` แล้ว)
 - ต้อง auth (`Authorization: Bearer <customer JWT>`, payload `{ cus_id, mcp, jti }` — `jti` ใหม่จาก phase จำกัดอุปกรณ์):
   - Auth/onboarding: `POST /store/auth/register`, `POST /store/auth/login`, `GET /store/me`, `PUT /store/me`, `PUT /store/me/password`, `PUT /store/me/onboarding`, `PUT /store/me/image`
   - Session: `GET /store/me/sessions` (รายการอุปกรณ์), `DELETE /store/me/sessions/:id` (เตะอุปกรณ์อื่น)
   - PDPA: `POST /store/me/deletion-request` (ขอลบข้อมูลบัญชี)
-  - Checkout: `POST /store/checkout` (รับ `product_ids` และ/หรือ `package_id` — สร้าง PromptPay PaymentIntent อัตโนมัติถ้ามี Stripe config, คืน `qr_image_url`/`qr_expires_at` มาด้วยถ้าสร้างสำเร็จ), `GET /store/orders/:id` (มี self-heal: เช็คสถานะจริงกับ Stripe ตรงๆ ถ้ายัง pending), `PUT /store/orders/:id/cancel` (ยกเลิกออเดอร์ที่ยังไม่จ่าย — เช็คสถานะจริงกับ Stripe ก่อนยกเลิกเสมอ กัน race กับจ่ายสำเร็จพอดี), `GET /store/my/entitlements` — **`POST /store/orders/:id/confirm-payment` (mock) mount แบบมีเงื่อนไขเท่านั้น** (`ALLOW_MOCK_PAYMENT_CONFIRM=true` และยังไม่ตั้ง `STRIPE_SECRET_KEY` จริง) — checkoutAction ฝั่งนี้**ไม่เรียก endpoint นี้อัตโนมัติแล้ว** ต้องยิงตรงเอง (curl/Postman) หรือให้แอดมิน force-confirm ที่หน้า `/orders` ฝั่งแอดมินแทนตอนทดสอบ local
+  - Checkout: `POST /store/checkout` (รับ `product_ids` และ/หรือ `package_id` — สร้าง PromptPay PaymentIntent อัตโนมัติถ้ามี Stripe config, คืน `qr_image_url`/`qr_expires_at` มาด้วยถ้าสร้างสำเร็จ), `GET /store/orders` (รายการคำสั่งซื้อของตัวเอง — ต้องประกาศ route ก่อน `/orders/:id` เสมอ), `GET /store/orders/:id` (มี self-heal: เช็คสถานะจริงกับ Stripe ตรงๆ ถ้ายัง pending), `PUT /store/orders/:id/cancel` (ยกเลิกออเดอร์ที่ยังไม่จ่าย — เช็คสถานะจริงกับ Stripe ก่อนยกเลิกเสมอ กัน race กับจ่ายสำเร็จพอดี), `GET /store/my/entitlements` — **`POST /store/orders/:id/confirm-payment` (mock) mount แบบมีเงื่อนไขเท่านั้น** (`ALLOW_MOCK_PAYMENT_CONFIRM=true` และยังไม่ตั้ง `STRIPE_SECRET_KEY` จริง) — checkoutAction ฝั่งนี้**ไม่เรียก endpoint นี้อัตโนมัติแล้ว** ต้องยิงตรงเอง (curl/Postman) หรือให้แอดมิน force-confirm ที่หน้า `/orders` ฝั่งแอดมินแทนตอนทดสอบ local
   - ทำข้อสอบ: `POST /store/products/:id/attempts` (เริ่ม/resume), `GET /store/attempts` (ประวัติ), `GET /store/me/weak-areas` (สรุปจุดอ่อนรายหมวด), `GET /store/attempts/:id`, `PUT /store/attempts/:id/answers/:questionId`, `POST /store/attempts/:id/submit`, `GET /store/attempts/:id/review`
   - Bookmark: `GET /store/bookmarks`, `POST /store/bookmarks/:questionId`, `DELETE /store/bookmarks/:questionId`
   - แจ้งปัญหา: `POST /store/questions/:id/report`

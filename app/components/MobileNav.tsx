@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import Image from "next/image";
-import { Menu, X, BookOpen, Layers, Settings, LogOut, User } from "lucide-react";
+import { Menu, X, BookOpen, Layers, LogOut, User } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { NAV_LINKS } from "./navLinks";
+import { NAV_LINKS, ACCOUNT_LINKS } from "./navLinks";
 import { logoutAction } from "@/app/actions/auth";
 
 type Props = {
@@ -130,16 +130,18 @@ export default function MobileNav({ session, fullName, avatarUrl }: Props) {
                                             {link.label}
                                         </Link>
                                     ))}
-                                {session && (
-                                    <Link
-                                        href="/account"
-                                        onClick={closeMenu}
-                                        className="flex items-center gap-3 px-4 py-3 text-sm text-slate-600 transition-colors hover:bg-slate-50 hover:text-brand-600"
-                                    >
-                                        <Settings size={18} />
-                                        บัญชีของฉัน
-                                    </Link>
-                                )}
+                                {session &&
+                                    ACCOUNT_LINKS.map((link) => (
+                                        <Link
+                                            key={link.href}
+                                            href={link.href}
+                                            onClick={closeMenu}
+                                            className="flex items-center gap-3 px-4 py-3 text-sm text-slate-600 transition-colors hover:bg-slate-50 hover:text-brand-600"
+                                        >
+                                            <link.icon size={18} />
+                                            {link.label}
+                                        </Link>
+                                    ))}
                             </nav>
 
                             <div className="shrink-0 border-t border-slate-100 p-3">
