@@ -34,7 +34,7 @@ export default async function Image() {
                 }}
             >
                 {/* eslint-disable-next-line @next/next/no-img-element -- ImageResponse (Satori) ต้องใช้ <img> ธรรมดา ใช้ next/image ไม่ได้ */}
-                <img src={logoSrc} width={620} height={175} alt="" />
+                <img src={logoSrc} width={620} height={171} alt="" />
                 <div style={{ display: "flex", fontSize: 32, color: "rgba(255,255,255,0.9)", marginTop: 40 }}>
                     แนวข้อสอบออนไลน์พร้อมเฉลยละเอียด
                 </div>

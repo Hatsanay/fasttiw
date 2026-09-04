@@ -22,7 +22,7 @@ const OUT = path.join(__dirname, "..", "public", "logo", "watermark-tiled.png");
 const CANVAS_W = 1000;
 const CANVAS_H = 1300;
 const TILE_W = 100;
-const TILE_H = 28; // 100 / 3.543 = 28.2 ปัดลง — สัดส่วนโลโก้ตาม brand kit ชุดปัจจุบัน (496:140)
+const TILE_H = 28; // 100 / 3.622 = 27.6 ปัดขึ้น — สัดส่วนโลโก้ตาม brand kit ชุดปัจจุบัน (478:132)
 const MARGIN_X = 20; // marginLeft/marginRight เดิม
 const MARGIN_Y = 42; // คุมให้ CELL_H คง ~112 เท่าเดิม (11 แถว x 7 คอลัมน์ = 77 tiles)
 const CELL_W = MARGIN_X + TILE_W + MARGIN_X; // 140
