@@ -7,6 +7,7 @@ import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import { authorizedFetch } from "@/lib/session";
 import { cn } from "@/lib/cn";
+import { hasScoring, formatScore } from "@/lib/scoring";
 import BookmarkButton from "@/app/components/BookmarkButton";
 import ReportQuestionButton from "@/app/components/ReportQuestionButton";
 import QuestionImage from "@/app/components/QuestionImage";
@@ -21,6 +22,7 @@ type ReviewQuestion = {
     ques_image_url: string | null;
     choices: { cho_id: string; cho_text: string; cho_image_url: string | null }[];
     selected_choice_id: string | null;
+    ques_score: string | number | null;
     reveal: { correct_choice_id: string; explanation: string | null; choice_reasons: ChoiceReason[] };
     is_correct: boolean;
 };
@@ -29,6 +31,9 @@ type Review = {
     prod_name: string;
     att_mode: "practice" | "timed";
     att_score: number;
+    // สองค่านี้เป็น null ถ้าชุดข้อสอบนั้นไม่ใช้ระบบคะแนน (คิดผลเป็น % จากจำนวนข้อเหมือนเดิม)
+    att_earned_score: string | number | null;
+    att_max_score: string | number | null;
     att_total_questions: number;
     questions: ReviewQuestion[];
 };
@@ -49,6 +54,10 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
     // เพราะถ้าแอดมินแก้เฉลยทีหลัง (เช่น มีคนแจ้งปัญหาข้อนี้) ตัวเลขจะไม่ตรงกับ % คะแนนรวมด้านบนที่ freeze ไว้แล้ว
     const correctCount = review.questions.filter((q) => q.is_correct).length;
 
+    // ชุดนี้ใช้ระบบคะแนนไหม — ดูจาก att_max_score ที่ freeze ไว้ตอนเริ่มทำ ไม่ใช่ค่าปัจจุบันของชุดข้อสอบ
+    // (แอดมินอาจเปิด/ปิดระบบคะแนนทีหลัง ผลสอบใบนี้ต้องแสดงตามกติกา ณ ตอนที่ลูกค้าทำจริง)
+    const scored = hasScoring(review.att_max_score);
+
     return (
         <div className="flex flex-col min-h-screen">
             <Navbar />
@@ -56,10 +65,24 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
                 <div className="text-center mb-10">
                     <p className="text-sm text-slate-400 mb-1">{review.prod_name}</p>
                     <h1 className="text-2xl font-semibold text-slate-900 mb-3">เฉลยข้อสอบ</h1>
-                    <p className="text-4xl font-semibold text-brand-600">{Number(review.att_score).toFixed(0)}%</p>
-                    <p className="text-sm text-slate-400 mt-1">
-                        ตอบถูก {correctCount} จาก {review.att_total_questions} ข้อ
-                    </p>
+                    {scored ? (
+                        <>
+                            <p className="text-4xl font-semibold text-brand-600">
+                                {formatScore(review.att_earned_score)}
+                                <span className="text-2xl text-slate-400"> / {formatScore(review.att_max_score)}</span>
+                            </p>
+                            <p className="text-sm text-slate-400 mt-1">
+                                คิดเป็น {Number(review.att_score).toFixed(0)}% — ตอบถูก {correctCount} จาก {review.att_total_questions} ข้อ
+                            </p>
+                        </>
+                    ) : (
+                        <>
+                            <p className="text-4xl font-semibold text-brand-600">{Number(review.att_score).toFixed(0)}%</p>
+                            <p className="text-sm text-slate-400 mt-1">
+                                ตอบถูก {correctCount} จาก {review.att_total_questions} ข้อ
+                            </p>
+                        </>
+                    )}
                 </div>
 
                 <div className="flex flex-col gap-6">
@@ -82,6 +105,12 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
                                     >
                                         {isSkipped ? <MinusCircle size={13} /> : isCorrect ? <Check size={13} /> : <X size={13} />}
                                         {isSkipped ? "ไม่ได้ตอบ" : isCorrect ? "ถูก" : "ผิด"}
+                                        {/* ได้กี่คะแนนจากเต็มกี่คะแนนของข้อนี้ — ตอบผิด/ไม่ตอบ = 0 */}
+                                        {scored && (
+                                            <span className="font-normal opacity-70">
+                                                · {isCorrect ? formatScore(q.ques_score) : "0"}/{formatScore(q.ques_score)} คะแนน
+                                            </span>
+                                        )}
                                     </span>
                                 </div>
 

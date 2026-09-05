@@ -23,15 +23,15 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 export default async function SamplePage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
-    const [product, questions] = await Promise.all([getPublicProduct(id), getSampleQuestions(id)]);
-    if (!product || questions.length === 0) notFound();
+    const [product, sample] = await Promise.all([getPublicProduct(id), getSampleQuestions(id)]);
+    if (!product || sample.questions.length === 0) notFound();
 
     return (
         <div className="flex flex-col min-h-screen bg-slate-50/50">
             <Navbar />
             <main className="flex-1">
                 <p className="pt-8 text-center text-sm font-medium text-brand-600">{product.prod_name} — ตัวอย่างฟรี</p>
-                <SampleExam productId={id} questions={questions} />
+                <SampleExam productId={id} questions={sample.questions} totalScore={sample.totalScore} />
             </main>
             <Footer />
         </div>

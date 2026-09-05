@@ -9,6 +9,7 @@ type RawQuestion = {
     ques_id: string;
     ques_text: string;
     ques_image_url: string | null;
+    ques_score: string | number | null;
     choices: { cho_id: string; cho_text: string; cho_image_url: string | null }[];
     reveal: {
         correct_choice_id: string | null;
@@ -42,6 +43,7 @@ async function toPdfQuestion(q: RawQuestion): Promise<ExportPdfQuestion> {
     return {
         ques_id: q.ques_id,
         ques_text: q.ques_text,
+        ques_score: q.ques_score,
         ques_image: quesImage,
         choices: q.choices.map((c, i) => ({ cho_id: c.cho_id, cho_text: c.cho_text, cho_image: choiceImages[i] })),
         reveal: q.reveal,
@@ -62,12 +64,17 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         const body = await res.json().catch(() => ({ message: "ไม่สามารถสร้างไฟล์ PDF ได้" }));
         return NextResponse.json(body, { status: res.status });
     }
-    const data: { prod_name: string; questions: RawQuestion[] } = await res.json();
+    const data: { prod_name: string; prod_total_score: string | number | null; questions: RawQuestion[] } = await res.json();
     const questions = await Promise.all(data.questions.map(toPdfQuestion));
 
     const watermarkTiledImage = loadWatermarkTiledImage();
     const buffer = await renderToBuffer(
-        <ExamPdfDocument productName={data.prod_name} questions={questions} watermarkTiledImage={watermarkTiledImage} />
+        <ExamPdfDocument
+            productName={data.prod_name}
+            totalScore={data.prod_total_score}
+            questions={questions}
+            watermarkTiledImage={watermarkTiledImage}
+        />
     );
 
     return new NextResponse(new Uint8Array(buffer), {

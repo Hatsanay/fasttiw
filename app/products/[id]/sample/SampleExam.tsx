@@ -9,10 +9,21 @@ import Button from "@/components/ui/Button";
 import QuestionImage from "@/app/components/QuestionImage";
 import ChoiceImage from "@/app/components/ChoiceImage";
 import type { SampleQuestion } from "@/lib/api";
+import { hasScoring, formatScore } from "@/lib/scoring";
 
 // ตัวอย่างฟรีมีเฉลยเต็มมาจาก backend อยู่แล้ว (reveal=true) ไม่ต้องยิง API ต่อคำตอบเหมือนตอนทำข้อสอบจริง
 // ตั้งใจโชว์เฉลยแค่หลังตอบข้อนั้นแล้ว (ไม่ใช่โชว์ทั้งหมดตั้งแต่แรก) ให้ความรู้สึกเหมือนกำลัง "ลองทำ" จริงๆ
-export default function SampleExam({ productId, questions }: { productId: string; questions: SampleQuestion[] }) {
+export default function SampleExam({
+    productId,
+    questions,
+    totalScore,
+}: {
+    productId: string;
+    questions: SampleQuestion[];
+    totalScore: string | number | null;
+}) {
+    // หน้าตัวอย่างไม่มี attempt จึงไม่มี snapshot — ใช้คะแนนเต็มปัจจุบันของชุดข้อสอบตรงๆ
+    const scored = hasScoring(totalScore);
     const [index, setIndex] = useState(0);
     const [answered, setAnswered] = useState<Record<string, string>>({});
 
@@ -31,6 +42,7 @@ export default function SampleExam({ productId, questions }: { productId: string
             <div className="flex items-center justify-between mb-2 text-sm text-slate-500">
                 <span>
                     ตัวอย่างข้อ {index + 1} จาก {questions.length}
+                    {scored && <span className="text-slate-400"> · ข้อนี้ {formatScore(question.ques_score)} คะแนน (ชุดเต็ม {formatScore(totalScore)})</span>}
                 </span>
             </div>
             <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden mb-8">

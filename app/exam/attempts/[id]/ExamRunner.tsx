@@ -10,6 +10,7 @@ import Button from "@/components/ui/Button";
 import QuestionImage from "@/app/components/QuestionImage";
 import ChoiceImage from "@/app/components/ChoiceImage";
 import { submitAnswerAction, submitAttemptAction, abandonAttemptAction, type AnswerReveal } from "@/app/actions/exam";
+import { hasScoring, formatScore } from "@/lib/scoring";
 
 type Question = {
     ques_id: string;
@@ -17,12 +18,15 @@ type Question = {
     ques_image_url: string | null;
     choices: { cho_id: string; cho_text: string; cho_image_url: string | null }[];
     selected_choice_id: string | null;
+    ques_score: string | number | null;
     reveal: AnswerReveal | null;
 };
 
 type Attempt = {
     att_id: string;
     att_mode: "practice" | "timed";
+    // null = ชุดนี้ไม่ใช้ระบบคะแนน (snapshot ไว้ตอนเริ่มทำ ไม่อ่านค่าปัจจุบันของชุดข้อสอบ)
+    att_max_score: string | number | null;
     att_total_questions: number;
     att_time_limit_minutes: number | null;
     att_started_at: string;
@@ -42,6 +46,8 @@ const flagStorageKey = (attId: string) => `examFlags:${attId}`;
 
 export default function ExamRunner({ attempt }: { attempt: Attempt }) {
     const router = useRouter();
+    // ชุดนี้ใช้ระบบคะแนนไหม — ยึด snapshot ตอนเริ่มทำ ไม่ใช่ค่าปัจจุบันของชุดข้อสอบ (แอดมินอาจเปลี่ยนกลางคัน)
+    const scored = hasScoring(attempt.att_max_score);
     const [questions, setQuestions] = useState(attempt.questions);
     const [index, setIndex] = useState(0);
     const [viewMode, setViewMode] = useState<"single" | "all">("single");
@@ -249,7 +255,14 @@ export default function ExamRunner({ attempt }: { attempt: Attempt }) {
         return (
             <Card className="p-6 flex-1 flex flex-col">
                 <div className="flex items-center justify-between mb-2">
-                    {showNumber ? <p className="text-sm font-medium text-brand-600">ข้อที่ {displayNumber}</p> : <span />}
+                    <div className="flex items-center gap-2">
+                        {showNumber && <p className="text-sm font-medium text-brand-600">ข้อที่ {displayNumber}</p>}
+                        {scored && (
+                            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
+                                {formatScore(q.ques_score)} คะแนน
+                            </span>
+                        )}
+                    </div>
                     <button
                         type="button"
                         onClick={() => handleToggleFlag(q.ques_id)}
@@ -334,6 +347,7 @@ export default function ExamRunner({ attempt }: { attempt: Attempt }) {
                     ) : (
                         <>ตอบแล้ว {answeredCount} จาก {questions.length} ข้อ</>
                     )}
+                    {scored && <span className="text-slate-400"> · เต็ม {formatScore(attempt.att_max_score)} คะแนน</span>}
                 </span>
                 {remainingSeconds !== null ? (
                     <span className={cn("flex items-center gap-1.5 font-medium", remainingSeconds < 60 ? "text-red-500" : "text-slate-600")}>

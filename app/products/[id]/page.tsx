@@ -65,7 +65,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
     const cover = productCoverUrl(product.prod_cover_url);
     const comparePrice = compareAtPrice(product);
     // เลือกข้อที่มีตัวเลือกผิดพร้อม wrong_reason ให้โชว์ครบทั้ง 2 จุดขาย (วิธีคิด + เหตุผลตัวเลือกผิด)
-    const demoQuestion = sampleQuestions.find((q) =>
+    const demoQuestion = sampleQuestions.questions.find((q) =>
         q.reveal.choice_reasons.some((r) => !r.is_correct && r.wrong_reason)
     );
 

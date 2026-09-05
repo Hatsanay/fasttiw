@@ -41,6 +41,7 @@ export type SampleQuestion = {
     ques_id: string;
     ques_text: string;
     ques_image_url: string | null;
+    ques_score: string | number | null;
     choices: { cho_id: string; cho_text: string; cho_image_url: string | null }[];
     selected_choice_id: string | null;
     reveal: {
@@ -50,11 +51,12 @@ export type SampleQuestion = {
     };
 };
 
-export async function getSampleQuestions(id: string): Promise<SampleQuestion[]> {
+// prod_total_score เป็น null = ชุดนี้ไม่ใช้ระบบคะแนน (หน้าตัวอย่างจะไม่แสดงคะแนนเลย)
+export async function getSampleQuestions(id: string): Promise<{ questions: SampleQuestion[]; totalScore: string | number | null }> {
     const res = await fetch(`${API_URL}/store/products/${id}/sample-questions`, { next: { revalidate: 60 } });
-    if (!res.ok) return [];
-    const { data } = await res.json();
-    return data;
+    if (!res.ok) return { questions: [], totalScore: null };
+    const { data, prod_total_score } = await res.json();
+    return { questions: data, totalScore: prod_total_score ?? null };
 }
 
 export type StorePackage = {

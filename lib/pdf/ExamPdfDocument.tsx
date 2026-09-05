@@ -5,6 +5,7 @@ import { Document, Page, Text, View, Image as PdfImage, StyleSheet, Font } from 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { toPdfThai } from "./thaiText";
+import { hasScoring, formatScore } from "../scoring";
 
 // react-pdf ไม่ผ่าน Next.js font loader เลย (คนละ render pipeline) ต้องลงทะเบียนไฟล์ฟอนต์ตรงๆ เอง
 // เหมือนที่ opengraph-image.tsx ทำไว้แล้ว — ต้องมี glyph ไทยฝังในไฟล์ ใช้ next/font/google ไม่ได้
@@ -50,6 +51,8 @@ const styles = StyleSheet.create({
     questionRow: { flexDirection: "row" },
     questionNumber: { fontSize: 11, fontWeight: "semibold", color: "#1D4ED8", width: 22 },
     questionText: { fontSize: 11, flex: 1, lineHeight: 1.5 },
+    // คะแนนรายข้อวางชิดขวาของบรรทัดโจทย์ ไม่ตั้ง flex เพื่อให้กว้างเท่าเนื้อหาจริง (โจทย์ยังกิน flex:1 เหมือนเดิม)
+    questionScore: { fontSize: 9, color: "#64748b", marginLeft: 6, marginTop: 1.5 },
     questionImage: { width: 260, height: 150, marginTop: 6, marginBottom: 8, marginLeft: 22, objectFit: "contain" },
 
     choiceRow: { flexDirection: "row", marginLeft: 22, marginBottom: 5 },
@@ -94,6 +97,7 @@ const styles = StyleSheet.create({
 export type ExportPdfQuestion = {
     ques_id: string;
     ques_text: string;
+    ques_score: string | number | null;
     ques_image: Buffer | null;
     choices: { cho_id: string; cho_text: string; cho_image: Buffer | null }[];
     reveal: {
@@ -105,13 +109,17 @@ export type ExportPdfQuestion = {
 
 export function ExamPdfDocument({
     productName,
+    totalScore,
     questions,
     watermarkTiledImage,
 }: {
     productName: string;
+    // null = ชุดนี้ไม่ใช้ระบบคะแนน — PDF จะไม่พิมพ์อะไรเกี่ยวกับคะแนนเลย หน้าตาเหมือนเดิมทุกประการ
+    totalScore: string | number | null;
     questions: ExportPdfQuestion[];
     watermarkTiledImage: Buffer;
 }) {
+    const scored = hasScoring(totalScore);
     return (
         <Document title={`แนวข้อสอบ ${productName}`}>
             <Page size="A4" style={styles.page} wrap>
@@ -126,7 +134,8 @@ export function ExamPdfDocument({
                     <Text style={styles.title}>{toPdfThai(`แนวข้อสอบ ${productName}`)}</Text>
                     <Text style={styles.meta}>
                         {toPdfThai(
-                            `จำนวน ${questions.length} ข้อ — ใช้สำหรับฝึกทำเท่านั้น ดูเฉลยและวิธีคิดทีละขั้นตอนได้ที่เว็บไซต์`
+                            `จำนวน ${questions.length} ข้อ${scored ? ` · คะแนนเต็ม ${formatScore(totalScore)} คะแนน` : ""}` +
+                                ` — ใช้สำหรับฝึกทำเท่านั้น ดูเฉลยและวิธีคิดทีละขั้นตอนได้ที่เว็บไซต์`
                         )}
                     </Text>
                 </View>
@@ -136,6 +145,9 @@ export function ExamPdfDocument({
                         <View style={styles.questionRow}>
                             <Text style={styles.questionNumber}>{i + 1}.</Text>
                             <Text style={styles.questionText}>{toPdfThai(q.ques_text)}</Text>
+                            {scored && (
+                                <Text style={styles.questionScore}>{toPdfThai(`(${formatScore(q.ques_score)} คะแนน)`)}</Text>
+                            )}
                         </View>
                         {q.ques_image && <PdfImage src={q.ques_image} style={styles.questionImage} />}
                         {q.choices.map((c, ci) => {
