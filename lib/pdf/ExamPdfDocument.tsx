@@ -4,6 +4,7 @@
 import { Document, Page, Text, View, Image as PdfImage, StyleSheet, Font } from "@react-pdf/renderer";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { toPdfThai } from "./thaiText";
 
 // react-pdf ไม่ผ่าน Next.js font loader เลย (คนละ render pipeline) ต้องลงทะเบียนไฟล์ฟอนต์ตรงๆ เอง
 // เหมือนที่ opengraph-image.tsx ทำไว้แล้ว — ต้องมี glyph ไทยฝังในไฟล์ ใช้ next/font/google ไม่ได้
@@ -122,9 +123,11 @@ export function ExamPdfDocument({
 
                 <View style={styles.header}>
                     <Text style={styles.brandText}>FASTTIW.COM</Text>
-                    <Text style={styles.title}>แนวข้อสอบ {productName}</Text>
+                    <Text style={styles.title}>{toPdfThai(`แนวข้อสอบ ${productName}`)}</Text>
                     <Text style={styles.meta}>
-                        จำนวน {questions.length} ข้อ — ใช้สำหรับฝึกทำเท่านั้น ดูเฉลยและวิธีคิดทีละขั้นตอนได้ที่เว็บไซต์
+                        {toPdfThai(
+                            `จำนวน ${questions.length} ข้อ — ใช้สำหรับฝึกทำเท่านั้น ดูเฉลยและวิธีคิดทีละขั้นตอนได้ที่เว็บไซต์`
+                        )}
                     </Text>
                 </View>
 
@@ -132,7 +135,7 @@ export function ExamPdfDocument({
                     <View key={q.ques_id} style={styles.question} wrap={false}>
                         <View style={styles.questionRow}>
                             <Text style={styles.questionNumber}>{i + 1}.</Text>
-                            <Text style={styles.questionText}>{q.ques_text}</Text>
+                            <Text style={styles.questionText}>{toPdfThai(q.ques_text)}</Text>
                         </View>
                         {q.ques_image && <PdfImage src={q.ques_image} style={styles.questionImage} />}
                         {q.choices.map((c, ci) => {
@@ -145,12 +148,11 @@ export function ExamPdfDocument({
                                     </Text>
                                     <View style={styles.choiceBody}>
                                         <Text style={[styles.choiceText, isCorrect ? styles.choiceTextCorrect : undefined]}>
-                                            {c.cho_text}
-                                            {isCorrect ? "  ✓ คำตอบที่ถูกต้อง" : ""}
+                                            {toPdfThai(`${c.cho_text}${isCorrect ? "  ✓ คำตอบที่ถูกต้อง" : ""}`)}
                                         </Text>
                                         {c.cho_image && <PdfImage src={c.cho_image} style={styles.choiceImage} />}
                                         {reason && !reason.is_correct && reason.wrong_reason && (
-                                            <Text style={styles.wrongReason}>✗ {reason.wrong_reason}</Text>
+                                            <Text style={styles.wrongReason}>{toPdfThai(`✗ ${reason.wrong_reason}`)}</Text>
                                         )}
                                     </View>
                                 </View>
@@ -159,7 +161,7 @@ export function ExamPdfDocument({
                         {q.reveal?.explanation && (
                             <View style={styles.explanationBox}>
                                 <Text style={styles.explanationLabel}>วิธีคิด</Text>
-                                <Text style={styles.explanationText}>{q.reveal.explanation}</Text>
+                                <Text style={styles.explanationText}>{toPdfThai(q.reveal.explanation)}</Text>
                             </View>
                         )}
                     </View>
