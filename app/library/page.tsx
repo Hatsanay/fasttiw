@@ -52,7 +52,8 @@ export default async function LibraryPage() {
                             const cover = productCoverUrl(e.prod_cover_url);
                             return (
                                 <Card key={e.ent_id} className="overflow-hidden flex flex-col">
-                                    <div className="relative aspect-4/3 bg-slate-50">
+                                    {/* สัดส่วน A4 เหมือน ProductCard — เป็นรูปหน้าปกชุดเดียวกัน ถ้าใช้สัดส่วนต่างกันจะครอปคนละแบบ */}
+                                    <div className="relative aspect-[210/297] bg-slate-50">
                                         {cover ? (
                                             <Image src={cover} alt={e.prod_name} fill className="object-cover" sizes="(max-width: 640px) 50vw, 25vw" />
                                         ) : (

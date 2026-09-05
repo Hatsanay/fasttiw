@@ -30,14 +30,18 @@ export default async function PackagesPage() {
                         <p>ยังไม่มีแพ็กเกจให้เลือกตอนนี้</p>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-5">
+                        {/* คอลัมน์ถี่ขึ้นหลังเปลี่ยนปกเป็นสัดส่วน A4 แนวตั้ง — เดิม 2 คอลัมน์ทำให้การ์ดกว้างราว 620px
+                            รูปจึงสูงเกิน 870px บังเนื้อหาข้างล่าง (ชื่อ/ราคา/รายการชุดที่รวมอยู่) จนต้องเลื่อนจอเยอะ
+                            คงไว้ 1 คอลัมน์บนมือถือเพราะการ์ดนี้มีรายการชุดข้อสอบพร้อมรูปย่ออยู่ข้างใน ถ้าบีบแคบกว่านี้ชื่อชุดจะโดนตัดทิ้งเกือบหมด */}
                         {packages.map((pkg) => {
                             const pkgCover = productCoverUrl(pkg.pkg_cover_url);
                             return (
                                 <Card key={pkg.pkg_id} id={pkg.pkg_id} className="overflow-hidden flex flex-col">
-                                    <div className="relative aspect-video bg-slate-50">
+                                    {/* สัดส่วน A4 แนวตั้ง (210:297) เหมือนปกชุดข้อสอบทุกจุดในเว็บ (เดิมเป็น 16:9 แนวนอน) */}
+                                    <div className="relative aspect-[210/297] bg-slate-50">
                                         {pkgCover ? (
-                                            <Image src={pkgCover} alt={pkg.pkg_name} fill className="object-cover" sizes="(max-width: 640px) 100vw, 50vw" />
+                                            <Image src={pkgCover} alt={pkg.pkg_name} fill className="object-cover" sizes="(max-width: 640px) 100vw, (max-width: 1024px) 33vw, 25vw" />
                                         ) : (
                                             <div className="flex h-full items-center justify-center text-slate-300">
                                                 <Layers size={32} />

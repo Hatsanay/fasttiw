@@ -21,7 +21,9 @@ export default function ProductCard({
     return (
         <Link href={`/products/${product.prod_id}`}>
             <Card className="overflow-hidden h-full flex flex-col transition-all hover:shadow-md hover:shadow-slate-200 hover:-translate-y-1 active:translate-y-0 active:scale-[0.98]">
-                <div className="relative aspect-4/3 bg-slate-50">
+                {/* สัดส่วน A4 แนวตั้ง (210:297) ให้ตรงกับหน้าปกชุดข้อสอบที่ออกแบบมาเป็นขนาด A4 — เดิมเป็น 4:3
+                    แนวนอน ทำให้ object-cover ครอปหัว/ท้ายปกทิ้ง (การ์ดนี้ใช้ร่วมกันทั้ง landing page และ /products) */}
+                <div className="relative aspect-[210/297] bg-slate-50">
                     {cover ? (
                         <Image src={cover} alt={product.prod_name} fill className="object-cover" sizes="(max-width: 640px) 50vw, 16vw" />
                     ) : (

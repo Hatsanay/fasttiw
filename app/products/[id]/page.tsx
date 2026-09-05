@@ -111,9 +111,13 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
             <Navbar />
             <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-10">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 sm:gap-12">
-                    <div className="relative aspect-4/3 bg-slate-50 rounded-2xl overflow-hidden border border-slate-100">
+                    {/* กรอบรูปเป็นสัดส่วน A4 แนวตั้ง (210:297) ให้ตรงกับหน้าปกชุดข้อสอบที่ออกแบบมาเป็นขนาด A4 —
+                        เดิมเป็น 4:3 แนวนอน ทำให้ object-cover ครอปหัว/ท้ายปกทิ้งไปเยอะ
+                        จำกัดความกว้างไว้ที่ max-w-sm เพราะบนจอใหญ่คอลัมน์นี้กว้างราว 600px ถ้าปล่อยเต็ม
+                        ความสูงจะพุ่งไปเกิน 800px สูงกว่าคอลัมน์ข้อมูลสินค้าข้างๆ มาก */}
+                    <div className="relative aspect-[210/297] w-full max-w-sm sm:mx-auto bg-slate-50 rounded-2xl overflow-hidden border border-slate-100">
                         {cover ? (
-                            <Image src={cover} alt={product.prod_name} fill className="object-cover" sizes="(max-width: 640px) 100vw, 50vw" priority />
+                            <Image src={cover} alt={product.prod_name} fill className="object-cover" sizes="(max-width: 640px) 100vw, 384px" priority />
                         ) : (
                             <div className="flex h-full items-center justify-center text-slate-300">
                                 <FileQuestion size={56} />
