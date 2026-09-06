@@ -39,13 +39,17 @@ export default function ImageLightbox({ url, open, onClose }: { url: string; ope
                 type="button"
                 onClick={onClose}
                 aria-label="ปิด"
-                className="absolute top-4 right-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+                // ต้องมี z-10 — กล่องรูปด้านล่างกว้างเต็มพื้นที่และอยู่หลังปุ่มนี้ใน DOM ถ้าไม่ยกชั้นขึ้นมา
+                // มันจะวาดทับปุ่ม X จนกดไม่โดน (เจอจริงตอนใช้งาน)
+                className="absolute top-4 right-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
             >
                 <X size={20} />
             </button>
 
-            {/* กดที่ตัวรูปไม่ปิด (กันปิดโดยไม่ตั้งใจตอนจะซูมด้วยสองนิ้ว) ปิดได้จากพื้นหลัง/ปุ่ม/Esc */}
-            <div className="relative h-full w-full" onClick={(e) => e.stopPropagation()}>
+            {/* กล่องรูปกินพื้นที่เต็มจอ (fill ต้องการ parent ที่มีขนาดชัดเจน) จึงแทบไม่เหลือ "พื้นหลัง" ให้แตะ
+                — ปล่อยให้คลิกทะลุไปถึง overlay ด้านนอกแทนการ stopPropagation จะได้ปิดได้จากทุกจุดจริงๆ
+                ตามที่ข้อความด้านล่างบอกไว้ (การซูมด้วยสองนิ้วเป็น gesture ไม่ใช่ click จึงไม่ทำให้ปิด) */}
+            <div className="relative h-full w-full">
                 <Image
                     src={url}
                     alt=""
@@ -60,7 +64,7 @@ export default function ImageLightbox({ url, open, onClose }: { url: string; ope
             </div>
 
             <p className="absolute bottom-5 left-0 right-0 text-center text-xs text-white/60">
-                แตะพื้นหลังหรือกด Esc เพื่อปิด
+                แตะที่ใดก็ได้หรือกด Esc เพื่อปิด
             </p>
         </div>
     );
