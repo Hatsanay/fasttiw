@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Check, X, MinusCircle } from "lucide-react";
+import { Check, X, MinusCircle, ListChecks, ChevronRight, RotateCcw, TrendingUp, TrendingDown } from "lucide-react";
 import Navbar from "@/app/components/Navbar";
 import Footer from "@/app/components/Footer";
 import Card from "@/components/ui/Card";
@@ -26,8 +26,17 @@ type ReviewQuestion = {
     reveal: { correct_choice_id: string; explanation: string | null; choice_reasons: ChoiceReason[] };
     is_correct: boolean;
 };
+// ผลรายหมวด "ของครั้งนี้" — accuracy คิดจาก earned/possible เหมือนทุกหน้า (ชุดที่ไม่ใช้ระบบคะแนน
+// นับข้อละ 1 คะแนน ผลจึงเท่ากับการนับจำนวนข้อ)
+type TopicResult = {
+    tpc_id: string; tpc_name: string;
+    correct: number; total: number;
+    earned: number; possible: number; scored: boolean;
+    accuracy: number;
+};
 type Review = {
     att_id: string;
+    att_product_id: string;
     prod_name: string;
     att_mode: "practice" | "timed";
     att_score: number;
@@ -35,8 +44,24 @@ type Review = {
     att_earned_score: string | number | null;
     att_max_score: string | number | null;
     att_total_questions: number;
+    att_started_at: string;
+    att_submitted_at: string | null;
+    // null = ครั้งแรกที่ทำชุดนี้ จึงไม่มีอะไรให้เทียบ
+    prev_score: string | number | null;
+    // ข้อของชุดนี้ที่ยังตอบผิดอยู่ นับข้ามทุกครั้งที่ทำ (ไม่ใช่เฉพาะใบนี้) — ตรงกับที่หน้า /history/mistakes โชว์
+    mistake_count: number;
+    topic_breakdown: TopicResult[];
     questions: ReviewQuestion[];
 };
+
+// เวลาที่ใช้ทำจริง — คิดจากเวลาเริ่มถึงเวลาส่ง เหมือนที่หน้า /history ใช้
+function formatDuration(startedAt: string, submittedAt: string | null): string | null {
+    if (!submittedAt) return null;
+    const minutes = Math.round((new Date(submittedAt).getTime() - new Date(startedAt).getTime()) / 60000);
+    if (minutes < 1) return "ไม่ถึง 1 นาที";
+    if (minutes < 60) return `${minutes} นาที`;
+    return `${Math.floor(minutes / 60)} ชม. ${minutes % 60} นาที`;
+}
 
 export default async function ReviewPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
@@ -58,6 +83,18 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
     // (แอดมินอาจเปิด/ปิดระบบคะแนนทีหลัง ผลสอบใบนี้ต้องแสดงตามกติกา ณ ตอนที่ลูกค้าทำจริง)
     const scored = hasScoring(review.att_max_score);
 
+    // แยก "ตอบผิด" ออกจาก "ไม่ได้ตอบ" — สองอย่างนี้แก้คนละวิธี (ตอบผิดคือไม่เข้าใจ ไม่ได้ตอบคือคุมเวลาไม่ทัน)
+    // แต่ทั้งคู่ได้ 0 คะแนนเหมือนกัน % คะแนนจึงไม่เปลี่ยน
+    //
+    // นับทั้งสองค่าจากคำถามที่มีอยู่จริงตรงๆ ไม่ใช่ลบออกจาก att_total_questions — ถ้าแอดมินปิดคำถามบางข้อ
+    // หลังลูกค้าทำไปแล้ว ข้อนั้นจะหายจาก questions แต่ att_total_questions ที่ freeze ไว้ยังนับรวมอยู่
+    // การลบจะทำให้ข้อที่ถูกปิดไปโผล่เป็น "ตอบผิด" ทั้งที่ลูกค้าอาจตอบถูก
+    const skippedCount = review.questions.filter((q) => !q.selected_choice_id).length;
+    const wrongCount = review.questions.filter((q) => q.selected_choice_id && !q.is_correct).length;
+    const duration = formatDuration(review.att_started_at, review.att_submitted_at);
+    const prevScore = review.prev_score === null ? null : Number(review.prev_score);
+    const diff = prevScore === null ? null : Number(review.att_score) - prevScore;
+
     return (
         <div className="flex flex-col min-h-screen">
             <Navbar />
@@ -65,24 +102,116 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
                 <div className="text-center mb-10">
                     <p className="text-sm text-slate-400 mb-1">{review.prod_name}</p>
                     <h1 className="text-2xl font-semibold text-slate-900 mb-3">เฉลยข้อสอบ</h1>
+                    {/* หัวหน้าเหลือแค่คะแนน — "ตอบถูก X จาก Y ข้อ" ย้ายไปอยู่ในบล็อกสรุปถัดลงไปแล้ว
+                        (เดิมอยู่ทั้งสองที่ อ่านเจอเรื่องเดียวกันซ้ำสองรอบติดกัน) */}
                     {scored ? (
                         <>
                             <p className="text-4xl font-semibold text-brand-600">
                                 {formatScore(review.att_earned_score)}
                                 <span className="text-2xl text-slate-400"> / {formatScore(review.att_max_score)}</span>
                             </p>
-                            <p className="text-sm text-slate-400 mt-1">
-                                คิดเป็น {Number(review.att_score).toFixed(0)}% — ตอบถูก {correctCount} จาก {review.att_total_questions} ข้อ
-                            </p>
+                            <p className="text-sm text-slate-400 mt-1">คิดเป็น {Number(review.att_score).toFixed(0)}%</p>
                         </>
                     ) : (
-                        <>
-                            <p className="text-4xl font-semibold text-brand-600">{Number(review.att_score).toFixed(0)}%</p>
-                            <p className="text-sm text-slate-400 mt-1">
-                                ตอบถูก {correctCount} จาก {review.att_total_questions} ข้อ
-                            </p>
-                        </>
+                        <p className="text-4xl font-semibold text-brand-600">{Number(review.att_score).toFixed(0)}%</p>
                     )}
+                </div>
+
+                {/* สรุปผลครั้งนี้ — วางไว้บนสุดก่อนข้อ 1 ตามที่ผู้ใช้ระบุ
+                    เดิมหน้านี้บอกแค่ % แล้วโยนรายการคำถามใส่ทันที ผู้ใช้ต้องไล่นับเองว่าผิดกี่ข้อ พลาดหมวดไหน */}
+                <Card className="mb-4 grid grid-cols-3 divide-x divide-slate-100 p-5">
+                    <div className="text-center">
+                        <p className="text-xl font-semibold text-green-600">{correctCount}</p>
+                        <p className="mt-0.5 text-xs text-slate-400">ตอบถูก</p>
+                    </div>
+                    <div className="text-center">
+                        <p className="text-xl font-semibold text-red-500">{wrongCount}</p>
+                        <p className="mt-0.5 text-xs text-slate-400">ตอบผิด</p>
+                    </div>
+                    <div className="text-center">
+                        <p className="text-xl font-semibold text-slate-400">{skippedCount}</p>
+                        <p className="mt-0.5 text-xs text-slate-400">ไม่ได้ตอบ</p>
+                    </div>
+                </Card>
+
+                {/* ยอดรวม + เวลาที่ใช้ + เทียบกับครั้งก่อนของชุดเดียวกัน — เทียบกับ "ครั้งก่อน" ไม่ใช่ "ดีที่สุด"
+                    เพราะสิ่งที่อยากรู้ทันทีหลังส่งคำตอบคือรอบนี้พัฒนาขึ้นไหม */}
+                <div className="mb-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-slate-400">
+                    <span>ตอบถูก {correctCount} จาก {review.att_total_questions} ข้อ</span>
+                    {duration && <span>ใช้เวลา {duration}</span>}
+                    {diff !== null && (
+                        <span
+                            className={cn(
+                                "inline-flex items-center gap-1 font-medium",
+                                diff > 0 ? "text-green-600" : diff < 0 ? "text-amber-600" : "text-slate-400"
+                            )}
+                        >
+                            {diff > 0 ? <TrendingUp size={13} /> : diff < 0 ? <TrendingDown size={13} /> : null}
+                            {diff === 0
+                                ? `เท่ากับครั้งก่อน (${prevScore?.toFixed(0)}%)`
+                                : `${diff > 0 ? "+" : ""}${diff.toFixed(0)}% จากครั้งก่อน (${prevScore?.toFixed(0)}%)`}
+                        </span>
+                    )}
+                </div>
+
+                {/* ผลรายหมวด เรียงหมวดที่แม่นน้อยสุดขึ้นก่อน = จุดอ่อนของรอบนี้อยู่บนสุดเสมอ
+                    ไม่ซ่อนหมวดที่ทำได้ดี เพราะการเห็นว่า "หมวดนี้แม่นแล้ว" มีค่าพอกับการเห็นจุดอ่อน */}
+                {review.topic_breakdown.length > 0 && (
+                    <Card className="mb-4 p-5">
+                        <p className="mb-3 text-sm font-medium text-slate-600">ผลรายหมวดของครั้งนี้</p>
+                        <div className="flex flex-col gap-2.5">
+                            {review.topic_breakdown.map((t) => (
+                                <div key={t.tpc_id}>
+                                    <div className="mb-1 flex items-baseline justify-between gap-2 text-xs">
+                                        <span className="min-w-0 truncate text-slate-600">{t.tpc_name}</span>
+                                        <span className="shrink-0 text-slate-400">
+                                            <span className={cn("font-medium", t.accuracy < 50 ? "text-red-500" : "text-slate-600")}>
+                                                {t.accuracy}%
+                                            </span>
+                                            {" · ถูก "}{t.correct}/{t.total} ข้อ
+                                        </span>
+                                    </div>
+                                    <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+                                        <div
+                                            className={cn("h-full rounded-full", t.accuracy < 50 ? "bg-red-400" : "bg-brand-500")}
+                                            style={{ width: `${t.accuracy}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </Card>
+                )}
+
+                {/* ทางไปทบทวนต่อ — ปิดท้ายบล็อกสรุป ก่อนเข้ารายการคำถาม */}
+                {review.mistake_count > 0 && (
+                    <Link href={`/history/mistakes?product_id=${review.att_product_id}`} className="block">
+                        <Card className="flex items-center gap-4 p-5 transition-colors hover:border-brand-200">
+                            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                                <ListChecks size={20} />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                                <span className="block font-medium text-slate-800">
+                                    ทบทวน {review.mistake_count} ข้อที่ยังตอบผิดในชุดนี้
+                                </span>
+                                <span className="mt-0.5 block text-xs text-slate-400">
+                                    รวมทุกครั้งที่ทำชุดนี้ ไม่ใช่เฉพาะรอบนี้ — ดูเฉลยพร้อมวิธีคิดทีละข้อ
+                                </span>
+                            </span>
+                            <ChevronRight size={18} className="shrink-0 text-slate-300" />
+                        </Card>
+                    </Link>
+                )}
+
+                {/* ปิดท้ายบล็อกสรุปด้วยทางไปหน้าประวัติ — สรุปตรงนี้เป็นของ "ครั้งนี้ครั้งเดียว"
+                    ส่วนหน้าประวัติรวมทุกครั้งทุกชุด (กราฟพัฒนาการ สรุปรายชุด จุดอ่อนสะสม) */}
+                <div className="mb-10 mt-4 flex justify-center">
+                    <Link href="/history">
+                        <Button variant="ghost" size="sm" className="inline-flex items-center gap-1 text-slate-500">
+                            ดูรายละเอียดเพิ่มเติม
+                            <ChevronRight size={14} />
+                        </Button>
+                    </Link>
                 </div>
 
                 <div className="flex flex-col gap-6">
@@ -159,7 +288,13 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
                     })}
                 </div>
 
-                <div className="flex justify-center mt-10">
+                <div className="mt-10 flex flex-wrap justify-center gap-3">
+                    <Link href={`/exam/${review.att_product_id}`}>
+                        <Button className="inline-flex items-center gap-1.5">
+                            <RotateCcw size={15} />
+                            ทำชุดนี้อีกครั้ง
+                        </Button>
+                    </Link>
                     <Link href="/library">
                         <Button variant="secondary">กลับไปคลังข้อสอบ</Button>
                     </Link>

@@ -7,7 +7,7 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import { authorizedFetch } from "@/lib/session";
 import { cn } from "@/lib/cn";
-import { hasScoring, formatScore } from "@/lib/scoring";
+import { hasScoring, formatScore, formatRawScore } from "@/lib/scoring";
 
 export const metadata = { title: "ประวัติการทำข้อสอบ" };
 
@@ -28,6 +28,8 @@ type Attempt = {
     att_earned_score: string | null;
     att_max_score: string | null;
     att_total_questions: number;
+    // จำนวนข้อที่ตอบถูกจริง — ชุดที่ไม่ใช้ระบบคะแนนใช้ค่านี้แทนคะแนนดิบ
+    att_correct_count: number;
     att_started_at: string;
     att_submitted_at: string | null;
 };
@@ -45,6 +47,11 @@ type Summary = {
     submitted_count: number;
     avg_score: number | null;
     latest_score: number | null;
+    // ตัวเลขดิบคู่กับ % — total_* รวมทุกครั้งทุกชุด, latest_* ของครั้งล่าสุดครั้งเดียว
+    total_correct: number;
+    total_questions: number;
+    latest_correct: number | null;
+    latest_questions: number | null;
 };
 
 // เวลาที่ใช้ทำจริง — มีข้อมูลอยู่แล้วทั้งเวลาเริ่มและเวลาส่ง แต่เดิมไม่เคยเอามาแสดง
@@ -67,9 +74,21 @@ type ProductSummary = {
     avg_score: number | null;
     latest_score: number | null;
     last_attempt_at: string;
-    // สองค่านี้เป็น null ถ้าชุดนั้นไม่ใช้ระบบคะแนน
+    // ค่าคะแนนเป็น null ถ้าครั้งนั้นไม่ได้ใช้ระบบคะแนน — best_*/latest_* เป็นของ attempt ใบนั้นจริงๆ
+    // ไม่ใช่ MAX ข้ามใบ (ชุดเดียวกันทำหลายครั้ง MAX อาจมาจากคนละใบกับที่ให้ best_score)
     best_earned_score: number | null;
+    best_max_score: number | null;
+    latest_earned_score: number | null;
+    latest_max_score: number | null;
+    avg_earned_score: number | null;
     max_score: number | null;
+    // ตัวเลขดิบคู่กับ % ทั้งสามค่า (ค่าเฉลี่ยมีทศนิยมได้ เช่น ถูก 1.4/5 ข้อ)
+    best_correct: number;
+    best_questions: number;
+    latest_correct: number;
+    latest_questions: number;
+    avg_correct: number;
+    avg_questions: number;
     // หมวดที่ควรทบทวน "ของชุดนี้" เรียงหมวดที่แม่นน้อยสุดขึ้นก่อน
     weak_topics: WeakArea[];
     // จำนวนข้อที่เคยตอบผิดและครั้งล่าสุดยังผิดอยู่ — กดเข้าไปดูเฉลยรายข้อได้ที่ /history/mistakes
@@ -94,7 +113,8 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
         summary,
     }: { data: Attempt[]; total: number; summary: Summary } = attemptsRes.ok
         ? await attemptsRes.json()
-        : { data: [], total: 0, summary: { submitted_count: 0, avg_score: null, latest_score: null } };
+        : { data: [], total: 0, summary: { submitted_count: 0, avg_score: null, latest_score: null,
+              total_correct: 0, total_questions: 0, latest_correct: null, latest_questions: null } };
     const { data: productSummary }: { data: ProductSummary[] } = productSummaryRes.ok
         ? await productSummaryRes.json()
         : { data: [] };
@@ -136,10 +156,15 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
                         <div className="text-center">
                             <p className="text-xl font-semibold text-slate-800">{summary.avg_score?.toFixed(0) ?? "—"}%</p>
                             <p className="text-xs text-slate-400 mt-0.5">คะแนนเฉลี่ย</p>
+                            {/* ตัวหารของค่าเฉลี่ยข้ามชุดไม่มีค่าเดียว จึงแสดงเป็นยอดรวมสะสมแทนเศษส่วนของ % */}
+                            <p className="text-[11px] text-slate-400">ถูก {summary.total_correct}/{summary.total_questions} ข้อ</p>
                         </div>
                         <div className="text-center">
                             <p className="text-xl font-semibold text-brand-600">{summary.latest_score?.toFixed(0) ?? "—"}%</p>
                             <p className="text-xs text-slate-400 mt-0.5">ครั้งล่าสุด</p>
+                            {summary.latest_questions !== null && (
+                                <p className="text-[11px] text-slate-400">ถูก {summary.latest_correct}/{summary.latest_questions} ข้อ</p>
+                            )}
                         </div>
                     </Card>
                 )}
@@ -203,18 +228,37 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
                                                     {ps.best_score?.toFixed(0) ?? "—"}%
                                                 </p>
                                                 <p className="text-[11px] text-slate-400">ดีที่สุด</p>
+                                                {/* ตัวเลขดิบใต้ทุกค่า — ชุดที่ใช้ระบบคะแนนโชว์คะแนน ชุดที่ไม่ใช้โชว์จำนวนข้อ */}
+                                                <p className="text-[11px] text-slate-400">
+                                                    {formatRawScore({
+                                                        earned: ps.best_earned_score, max: ps.best_max_score,
+                                                        correct: ps.best_correct, questions: ps.best_questions,
+                                                    })}
+                                                </p>
                                             </div>
                                             <div>
                                                 <p className={cn("text-lg font-semibold", droppedFromBest ? "text-amber-600" : "text-slate-800")}>
                                                     {ps.latest_score?.toFixed(0) ?? "—"}%
                                                 </p>
                                                 <p className="text-[11px] text-slate-400">ล่าสุด</p>
+                                                <p className="text-[11px] text-slate-400">
+                                                    {formatRawScore({
+                                                        earned: ps.latest_earned_score, max: ps.latest_max_score,
+                                                        correct: ps.latest_correct, questions: ps.latest_questions,
+                                                    })}
+                                                </p>
                                             </div>
                                             <div>
                                                 <p className="text-lg font-semibold text-slate-400">
                                                     {ps.avg_score?.toFixed(0) ?? "—"}%
                                                 </p>
                                                 <p className="text-[11px] text-slate-400">เฉลี่ย</p>
+                                                <p className="text-[11px] text-slate-400">
+                                                    {formatRawScore({
+                                                        earned: ps.avg_earned_score, max: ps.max_score,
+                                                        correct: ps.avg_correct, questions: ps.avg_questions,
+                                                    })}
+                                                </p>
                                             </div>
                                         </div>
 
@@ -249,7 +293,7 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
                                                                     <span className={cn("font-medium", t.accuracy < 50 ? "text-red-500" : "text-slate-600")}>
                                                                         {t.accuracy}%
                                                                     </span>
-                                                                    {" · จาก "}{t.total} ข้อ
+                                                                    {" · ถูก "}{formatScore(t.correct)}/{t.total} ข้อ
                                                                 </span>
                                                             </div>
                                                             <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
@@ -369,13 +413,13 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
                                                         <span className="text-sm text-slate-400">/{formatScore(a.att_max_score)}</span>
                                                     </p>
                                                     <p className="text-[11px] text-slate-400">
-                                                        {Number(a.att_score).toFixed(0)}% · {a.att_total_questions} ข้อ
+                                                        {Number(a.att_score).toFixed(0)}% · ถูก {a.att_correct_count}/{a.att_total_questions} ข้อ
                                                     </p>
                                                 </>
                                             ) : (
                                                 <>
                                                     <p className="text-lg font-semibold text-brand-600">{Number(a.att_score).toFixed(0)}%</p>
-                                                    <p className="text-[11px] text-slate-400">{a.att_total_questions} ข้อ</p>
+                                                    <p className="text-[11px] text-slate-400">ถูก {a.att_correct_count}/{a.att_total_questions} ข้อ</p>
                                                 </>
                                             )}
                                         </div>
