@@ -3,6 +3,7 @@ import { Kanit } from "next/font/google";
 import { Toaster } from "sonner";
 import OnboardingGate from "@/app/components/OnboardingGate";
 import ChatWidget from "@/app/components/ChatWidget";
+import VisitTracker from "@/app/components/VisitTracker";
 import { getSession } from "@/lib/session";
 import { SITE_URL } from "@/lib/site";
 import "./globals.css";
@@ -59,6 +60,8 @@ export default async function RootLayout({
         <OnboardingGate>{children}</OnboardingGate>
         <ChatWidget isLoggedIn={!!session} />
         <Toaster position="top-right" richColors />
+        {/* นับผู้เยี่ยมชมแบบไม่ใช้ cookie — ดู app/components/VisitTracker.tsx */}
+        <VisitTracker />
       </body>
     </html>
   );

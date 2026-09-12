@@ -1,3 +1,5 @@
+import { safeNextPath } from "@/lib/safeNext";
+
 // ตัวช่วยยิง JSON จากฝั่ง client ไปที่ Route Handler ของเราเอง — ใช้ร่วมกันทุกฟอร์มที่ย้ายออกจาก
 // Server Action เพราะ WAF ของโฮสต์บล็อกสตริง `$@` ที่ Next แนบมากับฟอร์ม Server Action
 // (ดู app/api/auth/login/route.ts) รวมไว้ที่เดียวเพื่อให้การจัดการ error เหมือนกันทุกฟอร์ม
@@ -26,6 +28,7 @@ export async function postJson(url: string, body: unknown): Promise<JsonResponse
 // ไปหน้าถัดไปแบบโหลดใหม่ทั้งหน้า (ไม่ใช่ router.push) เพราะเพิ่งตั้ง/ล้าง session cookie —
 // ต้องให้ Server Component ทุกตัวถูก render ใหม่ด้วย cookie ชุดใหม่ ไม่ใช้ของที่ค้างใน router cache
 // ตรวจซ้ำว่าเป็น path ภายในเว็บเท่านั้น กัน open redirect ถ้ามีใครแก้ค่า next ใน URL
+// (เดิมเช็คแค่ startsWith("/") ซึ่ง //evil.com ผ่านได้ — ดูเหตุผลเต็มที่ lib/safeNext.ts)
 export function hardNavigate(path: string) {
-    window.location.assign(path.startsWith("/") ? path : "/");
+    window.location.assign(safeNextPath(path, "/"));
 }

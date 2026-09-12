@@ -123,7 +123,8 @@ export default function RegisterForm({ next }: { next: string }) {
             setPending(false);
             return;
         }
-        hardNavigate(next);
+        // เด้งหน้าต้อนรับให้ใส่รูปโปรไฟล์ (ข้ามได้) แล้วค่อยไปหน้าที่ตั้งใจไว้ต่อ
+        hardNavigate(`/welcome?next=${encodeURIComponent(next)}`);
     }
 
     if (step === "otp") {

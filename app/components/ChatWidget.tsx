@@ -67,7 +67,7 @@ async function downloadImage(url: string) {
 
 function ImageLightbox({ url, onClose }: { url: string; onClose: () => void }) {
     return (
-        // z-70 > z-50 ของไอคอนแชทลอย เพื่อให้ lightbox ลอยอยู่บนสุดเสมอ
+        // อยู่ใน container ของแชท (z-40) ค่า z-70 นี้จึงมีผลแค่ภายใน widget — ให้ทับกล่องแชทของตัวเอง
         <div className="fixed inset-0 z-70 flex items-center justify-center bg-black/80 p-4" onClick={onClose}>
             <div className="relative max-h-full max-w-full" onClick={(e) => e.stopPropagation()}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -284,7 +284,11 @@ export default function ChatWidget({ isLoggedIn }: { isLoggedIn: boolean }) {
     if (hideOnExam) return null;
 
     return (
-        <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end gap-3">
+        // z-40 ต่ำกว่าหน้าต่างเต็มจอทุกตัวในเว็บ (z-50: ครอปรูปโปรไฟล์, onboarding, ขยายรูปโจทย์, เมนูมือถือ,
+        // แจ้งปัญหาข้อนี้) — เดิมเป็น z-50 เท่ากัน แล้ว widget นี้ render หลังสุดใน layout เลยชนะทุกครั้ง
+        // ไอคอนแชทลอยทับหน้าต่างพวกนั้น บังปุ่มยืนยันที่มุมขวาล่างของหน้าครอปรูปพอดี
+        // ลำดับชั้นในเว็บ: เนื้อหา < header (z-40, อยู่บน) = แชท (z-40, อยู่ล่างขวา) < หน้าต่างเต็มจอ (z-50)
+        <div className="fixed bottom-5 right-5 z-40 flex flex-col items-end gap-3">
             {isOpen && (
                 <div className="w-[min(22rem,calc(100vw-2.5rem))] h-[min(32rem,calc(100vh-8rem))] flex flex-col rounded-2xl border border-slate-200 bg-white shadow-xl overflow-hidden">
                     <div className="flex items-center justify-between px-4 py-3 bg-brand-600 text-white shrink-0">
