@@ -8,8 +8,12 @@ import { newsImageUrl } from "@/lib/api"; // ฟังก์ชันต่อ o
                                           // "news" จากตอนสร้างครั้งแรก แต่จริงๆ เป็น util ทั่วไป ใช้ต่อ
                                           // origin backend ให้ path อัปโหลดใดๆ ก็ได้ ไม่ได้ผูกกับข่าวสารเลย
 
-const OPEN_POLL_MS = 2500;
-const CLOSED_POLL_MS = 10000;
+// ความถี่เช็คข้อความใหม่ (ปรับ 2026-09-15 จากผลทดสอบโหลด — เดิมทุกคนที่เปิดเว็บเช็คทุก 10 วิตลอดเวลา แม้ไม่เคย
+// แชทและแม้สลับไปแท็บอื่น กิน CPU ของเว็บราว 1/3) · ไม่มีห้อง = ไม่เช็คเลย · แท็บถูกซ่อน = หยุดเช็ค
+const OPEN_POLL_MS = 2500;             // เปิดหน้าต่างแชทอยู่ = คุยสด
+const AWAITING_REPLY_POLL_MS = 10000;  // ปิดหน้าต่าง แต่เพิ่งส่งข้อความไป = กำลังรอคำตอบ จุดแดงต้องขึ้นไว
+const IDLE_POLL_MS = 30000;            // ปิดหน้าต่าง และไม่ได้คุยมาสักพัก
+const AWAITING_REPLY_WINDOW_MS = 10 * 60 * 1000;
 const GUEST_ID_KEY = "fasttiw_guest_chat_id";
 const LAST_SEEN_KEY = "fasttiw_chat_last_seen_at";
 
@@ -146,7 +150,7 @@ function MessageBubble({ msg, onImageClick }: { msg: ChatMessage; onImageClick: 
 // ไอคอนแชทลอยมุมขวาล่าง — โชว์ทุกหน้าฝั่งลูกค้า (mount ที่ root layout) แชทได้ทั้งตอนยัง login และ login แล้ว
 // (login แล้วผูกกับบัญชีจริงอัตโนมัติ ดู ensureConversation ฝั่ง backend) เรียกผ่าน Route Handler เสมอ
 // (/api/chat/...) ไม่ยิงตรงไป backend จาก browser — isLoggedIn เป็นแค่ hint ฝั่ง optimistic (เหมือนที่อื่นๆ
-// ในระบบนี้) ใช้กระตุ้นให้เรียก ensureConversation ซ้ำทันทีที่สถานะ login เปลี่ยน (เช่น login ระหว่างคุยอยู่)
+// ในระบบนี้) ใช้กระตุ้นให้หาห้องใหม่ทันทีที่สถานะ login เปลี่ยน (เช่น login ระหว่างคุยอยู่ = merge เข้าบัญชี)
 // ตัวตรวจสอบจริงอยู่ที่ Route Handler (อ่าน cookie httpOnly ฝั่ง server)
 export default function ChatWidget({ isLoggedIn }: { isLoggedIn: boolean }) {
     // ซ่อนไอคอนตอนกำลังทำข้อสอบจริง (หน้าตอบคำถามทีละข้อ) — ไม่ซ่อนตอนหน้าเลือกโหมด/หน้าดูเฉลยหลังส่ง
@@ -160,6 +164,7 @@ export default function ChatWidget({ isLoggedIn }: { isLoggedIn: boolean }) {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [text, setText] = useState("");
     const [isSending, setIsSending] = useState(false);
+    const [sendError, setSendError] = useState<string | null>(null);
     const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -173,20 +178,32 @@ export default function ChatWidget({ isLoggedIn }: { isLoggedIn: boolean }) {
         typeof window === "undefined" ? 0 : Number(localStorage.getItem(LAST_SEEN_KEY) ?? 0)
     ));
 
+    const [isVisible, setIsVisible] = useState(true);
+    const lookupFailedRef = useRef(false);
+
     const authHeaders = useCallback((): Record<string, string> => {
         // แนบ guest id เสมอถ้ามี (แม้ login แล้ว) เผื่อยังไม่เคย merge — backend ให้ความสำคัญกับ
         // บัญชีจริง (ถ้า login) มากกว่า guest id อยู่แล้วเสมอ ไม่ทำให้ข้อมูลปนกันผิดคน
         return guestIdRef.current ? { "X-Guest-Id": guestIdRef.current } : {};
     }, []);
 
-    const ensureConversation = useCallback(async () => {
-        guestIdRef.current = getOrCreateGuestId();
-        const res = await fetch("/api/chat/conversation", { method: "POST", headers: authHeaders() });
-        if (!res.ok) return null;
+    // create=false: หาห้องเดิมอย่างเดียว (ตอนเปิดหน้าเว็บ) — ไม่มีห้องได้ null · create=true: สร้างถ้ายังไม่มี
+    // (ตอนส่งข้อความแรก) — เดิมสร้างห้องให้ทุกคนที่เปิดเว็บ ห้องว่างเต็มรายการแชทแอดมิน (ตกลงกับผู้ใช้แล้วว่ายอม
+    // เสียความสามารถ "แอดมินทักคนที่ยังไม่เคยพิมพ์") · merge แชทเข้าบัญชีตอน login ยังทำงานเหมือนเดิมทั้งสองโหมด
+    // throw เมื่อเชื่อมต่อไม่ได้ (แยกจาก "ไม่มีห้อง")
+    const requestConversation = useCallback(async (create: boolean): Promise<string | null> => {
+        guestIdRef.current = create ? getOrCreateGuestId() : localStorage.getItem(GUEST_ID_KEY);
+        // ยังไม่ login และไม่เคยมี guest id = ไม่เคยแชทจากเบราว์เซอร์นี้แน่นอน ไม่ต้องถาม backend
+        if (!create && !isLoggedIn && !guestIdRef.current) return null;
+        const res = await fetch("/api/chat/conversation", {
+            method: "POST",
+            headers: { ...authHeaders(), "Content-Type": "application/json" },
+            body: JSON.stringify({ create }),
+        });
+        if (!res.ok) throw new Error(`conversation ${res.status}`);
         const data = await res.json();
-        return (data.conv_id as string) ?? null;
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isLoggedIn]);
+        return (data.conv_id as string | null) ?? null;
+    }, [isLoggedIn, authHeaders]);
 
     const fetchMessages = useCallback(async (id: string, isPoll: boolean) => {
         const url = isPoll && lastMsgIdRef.current
@@ -196,34 +213,73 @@ export default function ChatWidget({ isLoggedIn }: { isLoggedIn: boolean }) {
         if (!res.ok) return;
         const data = await res.json();
         const incoming: ChatMessage[] = data.messages ?? [];
+        if (!isPoll) { // โหลดทั้งห้อง = แทนที่เสมอ แม้ว่าง (สลับห้องแล้วต้องไม่เห็นข้อความของห้องเดิมค้าง)
+            lastMsgIdRef.current = incoming.at(-1)?.msg_id ?? null;
+            setMessages(incoming);
+            return;
+        }
         if (incoming.length === 0) return;
         lastMsgIdRef.current = incoming[incoming.length - 1].msg_id;
-        setMessages((prev) => (isPoll ? [...prev, ...incoming] : incoming));
+        setMessages((prev) => [...prev, ...incoming]);
     }, [authHeaders]);
 
-    // ผูกแชทเข้าบัญชีทันทีที่สถานะ login เปลี่ยน (เช่น login ระหว่างคุยอยู่ในฐานะผู้เยี่ยมชม)
+    // หาห้องเดิมตอนเปิดหน้าเว็บ + ทุกครั้งที่สถานะ login เปลี่ยน (login = merge แชทผู้เยี่ยมชมเข้าบัญชี /
+    // logout = ได้ห้องผู้เยี่ยมชมของเครื่องนี้ หรือไม่มีห้อง ไม่เห็นแชทของบัญชีค้างไว้)
     useEffect(() => {
+        let cancelled = false;
         const kickoff = setTimeout(async () => {
-            const id = await ensureConversation();
-            if (id) setConvId(id);
+            try {
+                const id = await requestConversation(false);
+                lookupFailedRef.current = false;
+                if (!cancelled) setConvId(id);
+            } catch {
+                lookupFailedRef.current = true; // ลองใหม่ตอนกดเปิดหน้าต่างแชท
+            }
         }, 0);
-        return () => clearTimeout(kickoff);
-    }, [ensureConversation]);
+        return () => { cancelled = true; clearTimeout(kickoff); };
+    }, [requestConversation]);
 
-    // โหลดประวัติครั้งแรกทันทีที่รู้ conv_id (ครั้งเดียว ไม่ใช่ทุกครั้งที่เปิด/ปิดหน้าต่าง)
+    // โหลดประวัติทั้งห้องทุกครั้งที่ห้องเปลี่ยน (ครั้งเดียว ไม่ใช่ทุกครั้งที่เปิด/ปิดหน้าต่าง)
     useEffect(() => {
-        if (!convId) return;
-        lastMsgIdRef.current = null;
-        const kickoff = setTimeout(() => fetchMessages(convId, false), 0);
+        const kickoff = setTimeout(() => {
+            if (convId) fetchMessages(convId, false);
+            else { lastMsgIdRef.current = null; setMessages([]); }
+        }, 0);
         return () => clearTimeout(kickoff);
     }, [convId, fetchMessages]);
 
-    // poll ต่อเนื่อง — ถี่ตอนเปิดหน้าต่างอยู่ ห่างลงตอนปิด (ยังอยากรู้ว่ามีข้อความใหม่มาไหมเพื่อโชว์ badge)
+    // แท็บถูกซ่อน (สลับแท็บ/แอป/ล็อกจอ) = หยุดเช็ค · กลับมาแล้วเช็คทันที 1 ครั้ง จุดแดงขึ้นเหมือนไม่เคยหยุด
     useEffect(() => {
-        if (!convId) return;
-        const interval = setInterval(() => fetchMessages(convId, true), isOpen ? OPEN_POLL_MS : CLOSED_POLL_MS);
-        return () => clearInterval(interval);
-    }, [convId, isOpen, fetchMessages]);
+        const onChange = () => {
+            const visible = document.visibilityState === "visible";
+            setIsVisible(visible);
+            if (visible && convId) fetchMessages(convId, true);
+        };
+        document.addEventListener("visibilitychange", onChange);
+        return () => document.removeEventListener("visibilitychange", onChange);
+    }, [convId, fetchMessages]);
+
+    // เวลาที่ลูกค้าส่งข้อความล่าสุด — ใช้ตัดสินว่า "กำลังรอคำตอบ" (เช็คถี่) หรือไม่ได้คุยแล้ว (เช็คห่าง)
+    const lastVisitorMsgAt = messages.reduce(
+        (max, m) => (m.msg_sender_type === "visitor" ? Math.max(max, new Date(m.msg_created_at).getTime()) : max), 0
+    );
+
+    // poll ต่อเนื่อง — ตั้งเวลารอบถัดไปใหม่ทุกรอบ (ไม่ใช้ setInterval) ให้ความถี่ขยับเองเมื่อพ้นช่วงรอคำตอบ
+    useEffect(() => {
+        if (!convId || !isVisible) return;
+        let stopped = false;
+        let timer: ReturnType<typeof setTimeout>;
+        const delay = () => isOpen ? OPEN_POLL_MS
+            : Date.now() - lastVisitorMsgAt < AWAITING_REPLY_WINDOW_MS ? AWAITING_REPLY_POLL_MS : IDLE_POLL_MS;
+        const schedule = () => {
+            timer = setTimeout(async () => {
+                await fetchMessages(convId, true).catch(() => {});
+                if (!stopped) schedule();
+            }, delay());
+        };
+        schedule();
+        return () => { stopped = true; clearTimeout(timer); };
+    }, [convId, isOpen, isVisible, lastVisitorMsgAt, fetchMessages]);
 
     // badge แจ้งข้อความใหม่ — derived ตรงๆ ทุก render (isOpen/messages/lastSeenAt เปลี่ยนก็ re-render อยู่
     // แล้วโดยธรรมชาติ ไม่ต้องมี effect แยกมาคำนวณ) การอัปเดต lastSeenAt จริงๆ เกิดตอนกดเปิดหน้าต่าง (ดู
@@ -237,14 +293,44 @@ export default function ChatWidget({ isLoggedIn }: { isLoggedIn: boolean }) {
         if (isOpen) scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
     }, [messages, isOpen]);
 
-    async function sendPayload(formData: FormData) {
-        if (!convId) return;
+    const postMessage = (id: string, formData: FormData) =>
+        fetch(`/api/chat/conversation/${id}/messages`, { method: "POST", headers: authHeaders(), body: formData });
+
+    // เดิมส่งไม่สำเร็จแล้วเงียบ — ข้อความที่พิมพ์หายไปเฉยๆ ลูกค้าเห็นแค่ว่า "กดส่งไม่ได้" (บั๊กที่เจอจริง 2026-09-15)
+    // draft = ข้อความที่พิมพ์ไว้ ใส่คืนในช่องพิมพ์ถ้าส่งไม่ออก ไม่ต้องพิมพ์ใหม่
+    async function sendPayload(formData: FormData, draft = "") {
         setIsSending(true);
+        setSendError(null);
         try {
-            const res = await fetch(`/api/chat/conversation/${convId}/messages`, {
-                method: "POST", headers: authHeaders(), body: formData,
-            });
-            if (res.ok) await fetchMessages(convId, true);
+            // ข้อความแรก = สร้างห้องตอนนี้ (ตอนเปิดหน้าเว็บแค่หาห้องเดิม ไม่สร้างให้)
+            let id = convId ?? await requestConversation(true);
+            if (!id) throw new Error("no conversation");
+            let res = await postMessage(id, formData);
+            // 404 = ห้องที่ถืออยู่ไม่ใช่ของเราแล้ว (เพิ่งออกจากระบบ / เซสชันหมดอายุหรือถูกเตะ) — ขอห้องที่ถูกต้อง
+            // จาก backend ใหม่แล้วส่งซ้ำ 1 ครั้ง ลูกค้าไม่ต้องรู้ตัวว่ามีการสลับห้อง
+            if (res.status === 404) {
+                const fresh = await requestConversation(true);
+                if (fresh) {
+                    id = fresh;
+                    res = await postMessage(id, formData);
+                }
+            }
+            if (res.ok) {
+                if (id === convId) {
+                    await fetchMessages(id, true);
+                } else {
+                    // ห้องใหม่ (ข้อความแรก หรือสลับห้องหลัง 404): โหลดทั้งห้องแทนการต่อท้าย
+                    setConvId(id);
+                    await fetchMessages(id, false);
+                }
+                return;
+            }
+            const data = await res.json().catch(() => ({}));
+            setSendError(data.message ?? "ส่งข้อความไม่สำเร็จ กรุณาลองอีกครั้ง");
+            if (draft) setText((cur) => cur || draft);
+        } catch {
+            setSendError("เชื่อมต่อไม่ได้ ตรวจสอบอินเทอร์เน็ตแล้วลองอีกครั้ง");
+            if (draft) setText((cur) => cur || draft);
         } finally {
             setIsSending(false);
         }
@@ -252,11 +338,12 @@ export default function ChatWidget({ isLoggedIn }: { isLoggedIn: boolean }) {
 
     async function handleSendText(e: React.FormEvent) {
         e.preventDefault();
-        if (!text.trim()) return;
+        const draft = text.trim();
+        if (!draft) return;
         const fd = new FormData();
-        fd.append("text", text.trim());
+        fd.append("text", draft);
         setText("");
-        await sendPayload(fd);
+        await sendPayload(fd, draft);
     }
 
     async function handlePickImages(e: React.ChangeEvent<HTMLInputElement>) {
@@ -270,6 +357,14 @@ export default function ChatWidget({ isLoggedIn }: { isLoggedIn: boolean }) {
 
     // เปิดหน้าต่าง = ถือว่าเห็นข้อความล่าสุดแล้ว จำเวลาไว้ (badge หายทันที + จำข้ามครั้งผ่าน localStorage)
     function handleToggleOpen() {
+        if (!isOpen) {
+            // ตอนปิดหน้าต่างเช็คห่างสุด 30 วิ — เปิดปุ๊บดึงข้อความล่าสุดทันที ไม่ให้เห็นของเก่า
+            if (convId) fetchMessages(convId, true);
+            // หาห้องเดิมตอนเปิดเว็บไม่สำเร็จ (เน็ตหลุด/backend ล่มชั่วคราว) — ลองใหม่ ไม่งั้นไม่เห็นประวัติแชทเดิม
+            else if (lookupFailedRef.current) {
+                requestConversation(false).then((id) => { lookupFailedRef.current = false; setConvId(id); }).catch(() => {});
+            }
+        }
         setIsOpen((prev) => {
             const next = !prev;
             if (next) {
@@ -308,11 +403,16 @@ export default function ChatWidget({ isLoggedIn }: { isLoggedIn: boolean }) {
                         )}
                         {messages.map((m) => <MessageBubble key={m.msg_id} msg={m} onImageClick={setLightboxUrl} />)}
                     </div>
+                    {sendError && (
+                        <p role="alert" className="border-t border-red-100 bg-red-50 px-3.5 py-2 text-xs text-red-600 shrink-0">
+                            {sendError}
+                        </p>
+                    )}
                     <form onSubmit={handleSendText} className="border-t border-slate-100 p-2.5 flex items-center gap-1.5 shrink-0">
                         <button
                             type="button"
                             onClick={() => fileInputRef.current?.click()}
-                            disabled={isSending || !convId}
+                            disabled={isSending}
                             className="p-2 text-slate-400 hover:text-brand-600 shrink-0 disabled:opacity-40"
                             title="แนบรูปภาพ"
                         >
@@ -323,12 +423,12 @@ export default function ChatWidget({ isLoggedIn }: { isLoggedIn: boolean }) {
                             value={text}
                             onChange={(e) => setText(e.target.value)}
                             placeholder="พิมพ์ข้อความ..."
-                            disabled={isSending || !convId}
+                            disabled={isSending}
                             className="flex-1 min-w-0 rounded-full border border-slate-200 px-3.5 py-2 text-sm outline-none focus:border-brand-300"
                         />
                         <button
                             type="submit"
-                            disabled={isSending || !text.trim() || !convId}
+                            disabled={isSending || !text.trim()}
                             className="p-2 rounded-full bg-brand-600 text-white shrink-0 disabled:opacity-40 hover:bg-brand-700 transition-colors"
                             title="ส่ง"
                         >
