@@ -12,6 +12,7 @@ import BookmarkButton from "@/app/components/BookmarkButton";
 import ReportQuestionButton from "@/app/components/ReportQuestionButton";
 import QuestionImage from "@/app/components/QuestionImage";
 import ChoiceImage from "@/app/components/ChoiceImage";
+import ReadinessCard, { type Readiness, type Pace } from "./ReadinessCard";
 
 export const metadata = { title: "เฉลยข้อสอบ" };
 
@@ -50,6 +51,9 @@ type Review = {
     prev_score: string | number | null;
     // ข้อของชุดนี้ที่ยังตอบผิดอยู่ นับข้ามทุกครั้งที่ทำ (ไม่ใช่เฉพาะใบนี้) — ตรงกับที่หน้า /history/mistakes โชว์
     mistake_count: number;
+    // null = ชุดนี้ไม่ได้ตั้งเกณฑ์ผ่าน / ไม่ใช่โหมดจับเวลา (ดู ReadinessCard)
+    readiness: Readiness | null;
+    pace: Pace | null;
     topic_breakdown: TopicResult[];
     questions: ReviewQuestion[];
 };
@@ -116,6 +120,14 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
                         <p className="text-4xl font-semibold text-brand-600">{Number(review.att_score).toFixed(0)}%</p>
                     )}
                 </div>
+
+                {/* "ถ้าสอบวันนี้ ผ่านไหม" — สิ่งแรกที่คนเพิ่งสอบเสร็จอยากรู้ ขึ้นเฉพาะชุดที่ตั้งเกณฑ์ผ่าน/โหมดจับเวลา */}
+                <ReadinessCard
+                    readiness={review.readiness ?? null}
+                    pace={review.pace ?? null}
+                    scorePercent={Number(review.att_score)}
+                    skippedCount={skippedCount}
+                />
 
                 {/* สรุปผลครั้งนี้ — วางไว้บนสุดก่อนข้อ 1 ตามที่ผู้ใช้ระบุ
                     เดิมหน้านี้บอกแค่ % แล้วโยนรายการคำถามใส่ทันที ผู้ใช้ต้องไล่นับเองว่าผิดกี่ข้อ พลาดหมวดไหน */}

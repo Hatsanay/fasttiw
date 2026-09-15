@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Check, X, PartyPopper, ArrowLeft, RotateCcw } from "lucide-react";
+import { Check, X, PartyPopper, ArrowLeft, RotateCcw, Repeat, ArrowRight } from "lucide-react";
 import Navbar from "@/app/components/Navbar";
 import Footer from "@/app/components/Footer";
 import Card from "@/components/ui/Card";
@@ -66,6 +66,11 @@ export default async function MistakesPage({
         return qs ? `/history/mistakes?${qs}` : "/history/mistakes";
     };
 
+    const practiceQuery = new URLSearchParams();
+    if (sp.product_id) practiceQuery.set("product_id", sp.product_id);
+    if (sp.topic_id) practiceQuery.set("topic_id", sp.topic_id);
+    const practiceHref = `/history/mistakes/practice${practiceQuery.size ? `?${practiceQuery}` : ""}`;
+
     // ชื่อชุด/หมวดที่กรองอยู่ ดึงจากข้อมูลที่ได้มา ไม่ต้องยิง API เพิ่มเพื่อรู้แค่ชื่อ
     const filterLabel = sp.topic_id
         ? data[0]?.tpc_name
@@ -110,6 +115,22 @@ export default async function MistakesPage({
                         รวมข้อที่แก้ได้แล้ว
                     </Link>
                 </div>
+
+                {/* ทำใหม่ — เปลี่ยนรายการ "ข้อที่ผิด" ให้เป็น "ข้อที่ทำได้แล้ว" (ตามตัวกรองเดียวกับที่ดูอยู่) */}
+                {!includeResolved && total > 0 && (
+                    <Link href={practiceHref} className="group mt-5 block">
+                        <Card className="flex items-center gap-4 p-5 border-brand-100 bg-brand-50/50 transition-colors group-hover:border-brand-200">
+                            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-600 text-white">
+                                <Repeat size={20} />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                                <span className="block font-medium text-slate-800">ทำใหม่ {Math.min(total, 10)} ข้อที่ยังผิด</span>
+                                <span className="mt-0.5 block text-xs text-slate-500">ตอบแล้วเห็นเฉลยทันที · ตอบถูกแล้วข้อนั้นหลุดจากรายการนี้</span>
+                            </span>
+                            <ArrowRight size={18} className="shrink-0 text-brand-600 transition-transform group-hover:translate-x-0.5" />
+                        </Card>
+                    </Link>
+                )}
 
                 {data.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-24 text-center text-slate-400">

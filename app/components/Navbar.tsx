@@ -42,6 +42,12 @@ export default async function Navbar() {
                     <Link href="/packages" className="hover:text-brand-600 transition-colors">
                         แพ็กเกจสุดคุ้ม
                     </Link>
+                    {/* เฉพาะคนที่ยังไม่ login — แถวบนของคน login แน่นแล้ว (มีลิงก์ประวัติ/คลังข้อสอบ) และมีสรุปจุดอ่อนของตัวเองอยู่แล้ว */}
+                    {!session && (
+                        <Link href="/diagnostic" className="hover:text-brand-600 transition-colors">
+                            วัดระดับฟรี
+                        </Link>
+                    )}
                     {session &&
                         NAV_LINKS.map((link) => (
                             <Link key={link.href} href={link.href} className="hover:text-brand-600 transition-colors">

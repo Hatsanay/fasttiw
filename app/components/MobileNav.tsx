@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import Image from "next/image";
-import { Menu, X, BookOpen, Layers, LogOut, User } from "lucide-react";
+import { Menu, X, BookOpen, Layers, LogOut, User, Target } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { NAV_LINKS, ACCOUNT_LINKS } from "./navLinks";
 import { logoutAction } from "@/app/actions/auth";
@@ -117,6 +117,14 @@ export default function MobileNav({ session, fullName, avatarUrl }: Props) {
                                 >
                                     <Layers size={18} />
                                     แพ็กเกจสุดคุ้ม
+                                </Link>
+                                <Link
+                                    href="/diagnostic"
+                                    onClick={closeMenu}
+                                    className="flex items-center gap-3 px-4 py-3 text-sm text-slate-600 transition-colors hover:bg-slate-50 hover:text-brand-600"
+                                >
+                                    <Target size={18} />
+                                    แบบทดสอบวัดระดับฟรี
                                 </Link>
                                 {session &&
                                     NAV_LINKS.map((link) => (

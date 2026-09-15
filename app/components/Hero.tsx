@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Sparkles, Smartphone, ListChecks, Timer, Bookmark, History, BadgePercent, LayoutGrid, GraduationCap, NotebookPen, QrCode, Download, ArrowRight } from "lucide-react";
+import { Sparkles, Smartphone, ListChecks, Timer, Bookmark, History, BadgePercent, LayoutGrid, GraduationCap, NotebookPen, QrCode, Download, ArrowRight, Target } from "lucide-react";
 import Button from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
 import {
@@ -184,9 +184,12 @@ export default function Hero() {
                                 <ArrowRight size={18} />
                             </Button>
                         </Link>
-                        <Link href="/register" className="w-full sm:w-auto">
+                        {/* ปุ่มรองเดิมคือ "สมัครสมาชิกฟรี" — เปลี่ยนเป็นแบบทดสอบวัดระดับ (2026-09-15) เพราะคนแปลกหน้าจาก
+                            เพจ/LINE ได้ของมีค่าทันทีโดยไม่ต้องสมัคร · ปุ่มสมัครยังอยู่ที่ navbar และท้ายหน้าแรก */}
+                        <Link href="/diagnostic" className="w-full sm:w-auto">
                             <Button size="lg" variant="secondary" className="w-full sm:w-auto">
-                                สมัครสมาชิกฟรี
+                                <Target size={18} className="text-brand-600" />
+                                วัดระดับฟรี 10 นาที
                             </Button>
                         </Link>
                     </div>

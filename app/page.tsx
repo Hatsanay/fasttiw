@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ListChecks, Timer, Bookmark, PenLine, SquareLibrary, PencilLine, CheckCheck, ArrowRight, Check, X } from "lucide-react";
+import { ListChecks, Timer, Bookmark, PenLine, SquareLibrary, PencilLine, CheckCheck, ArrowRight, Check, X, Target } from "lucide-react";
 import Navbar from "@/app/components/Navbar";
 import Footer from "@/app/components/Footer";
 import ProductCard from "@/app/components/ProductCard";
@@ -11,6 +11,15 @@ import Card from "@/components/ui/Card";
 import NewsFeedCard from "@/app/news/NewsFeedCard";
 import { getPublicProducts, getPublicCategories, getPopularProducts, getLandingNewsBlocks } from "@/lib/api";
 import { SITE_URL } from "@/lib/site";
+import { getDiagnosticCategories } from "@/lib/diagnostic";
+import { cn } from "@/lib/cn";
+
+// ภาพประกอบการ์ดแบบทดสอบวัดระดับ — สีและป้ายชุดเดียวกับหน้าผลจริง (DiagnosticResultView)
+const DIAGNOSTIC_PREVIEW = [
+    { name: "อนุกรม", pct: 33, label: "ควรเร่ง", bar: "bg-red-500", chip: "bg-red-50 text-red-600" },
+    { name: "อุปมาอุปไมย", pct: 67, label: "พอใช้", bar: "bg-amber-400", chip: "bg-amber-50 text-amber-700" },
+    { name: "คณิตศาสตร์พื้นฐาน", pct: 100, label: "แน่น", bar: "bg-green-500", chip: "bg-green-50 text-green-700" },
+];
 
 const HIGHLIGHTS = [
     {
@@ -48,11 +57,12 @@ export const metadata = {
 };
 
 export default async function HomePage() {
-    const [{ data: products }, categories, popularProducts, landingNews] = await Promise.all([
+    const [{ data: products }, categories, popularProducts, landingNews, diagnosticCategories] = await Promise.all([
         getPublicProducts({ limit: 100 }),
         getPublicCategories(),
         getPopularProducts(),
         getLandingNewsBlocks(),
+        getDiagnosticCategories(),
     ]);
 
     // structured data ระดับเว็บไซต์ — บอก Google ว่าเว็บนี้คือใคร (Organization) และเป็นเว็บไซต์ชื่ออะไร
@@ -114,6 +124,51 @@ export default async function HomePage() {
                         ))}
                     </div>
                 </section>
+
+                {/* แบบทดสอบวัดระดับฟรี — ของที่คนแปลกหน้าได้ทันทีก่อนจ่ายเงิน ขึ้นเฉพาะตอนมีหมวดให้ทำจริง
+                    แถบหัวข้อด้านขวาเป็น "ตัวอย่างผล" (ข้อความกำกับไว้) ไม่ใช่ผลของใคร */}
+                {diagnosticCategories.length > 0 && (
+                    <section className="max-w-360 mx-auto px-4 sm:px-6 pb-20">
+                        <Reveal>
+                            <Link href="/diagnostic" className="group block">
+                                <div className="relative overflow-hidden rounded-3xl border border-brand-100 bg-white p-6 sm:p-10 grid md:grid-cols-[1fr_minmax(0,22rem)] gap-8 items-center shadow-sm shadow-slate-200/60 transition-shadow group-hover:shadow-md">
+                                    <div className="pointer-events-none absolute -top-20 -left-20 h-56 w-56 rounded-full bg-brand-100/50 blur-3xl" />
+                                    <div className="relative">
+                                        <p className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-600 mb-2">
+                                            <Target size={16} />
+                                            ฟรี · ไม่ต้องสมัคร
+                                        </p>
+                                        <h2 className="text-2xl sm:text-3xl font-semibold text-slate-900 text-balance">
+                                            ไม่แน่ใจว่าควรเริ่มอ่านตรงไหน? วัดระดับก่อน 10 นาที
+                                        </h2>
+                                        <p className="mt-3 text-slate-600 leading-relaxed max-w-lg">
+                                            ทำข้อสอบสั้นๆ คละทุกหัวข้อ รู้ทันทีว่าหัวข้อไหนต้องเร่ง พร้อมเฉลยละเอียดทุกข้อ
+                                            และแนวข้อสอบที่ตรงจุดอ่อนของคุณ
+                                        </p>
+                                        <span className="mt-6 inline-flex items-center gap-2 rounded-full bg-brand-600 px-6 py-3 font-medium text-white shadow-sm shadow-brand-600/20 transition-colors group-hover:bg-brand-700">
+                                            เริ่มวัดระดับ
+                                            <ArrowRight size={18} className="transition-transform group-hover:translate-x-0.5" />
+                                        </span>
+                                    </div>
+                                    <div className="relative rounded-2xl border border-slate-100 bg-slate-50/60 p-5" aria-hidden>
+                                        <p className="text-xs text-slate-400 mb-3">ตัวอย่างผลที่จะได้</p>
+                                        {DIAGNOSTIC_PREVIEW.map((t) => (
+                                            <div key={t.name} className="mb-3 last:mb-0">
+                                                <div className="flex items-center justify-between text-xs mb-1">
+                                                    <span className="text-slate-600">{t.name}</span>
+                                                    <span className={cn("rounded-full px-2 py-0.5 font-medium", t.chip)}>{t.label}</span>
+                                                </div>
+                                                <div className="h-2 rounded-full bg-white">
+                                                    <div className={cn("h-full rounded-full", t.bar)} style={{ width: `${t.pct}%` }} />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </Link>
+                        </Reveal>
+                    </section>
+                )}
 
                 {/* Highlights */}
                 <section className="relative overflow-hidden bg-slate-50/70 border-y border-slate-100">
