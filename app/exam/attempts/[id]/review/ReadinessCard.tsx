@@ -7,7 +7,17 @@ import { formatScore } from "@/lib/scoring";
 // readiness = null → ชุดนี้ไม่ได้ตั้งเกณฑ์ผ่าน · pace = null → ไม่ใช่โหมดจับเวลา · ทั้งคู่ null → ไม่แสดงการ์ดเลย
 // เกณฑ์รายวิชา (2026-09-16): overall = เกณฑ์รวมทั้งชุด (null = ไม่ตั้ง) · subjects = วิชาที่ตั้งเกณฑ์ไว้
 // passed = ผ่านครบทุกเกณฑ์ที่ตั้ง (สนามสอบอย่าง ก.พ. ภาค ก ต้องผ่านทุกวิชา)
-export type Judgement = { pass_percent: number; passed: boolean; unit: "questions" | "points"; required: number; gap: number };
+// mode "min" = แอดมินตั้งเกณฑ์เป็นจำนวนข้อ/คะแนนขั้นต่ำตรงๆ (ไม่ใช่ %) — pass_percent เป็นแค่ตำแหน่งเส้นบนแถบ
+export type Judgement = {
+    mode?: "percent" | "min";
+    pass_percent: number;
+    passed: boolean;
+    unit: "questions" | "points";
+    required: number;
+    have?: number;
+    out_of?: number;
+    gap: number;
+};
 export type SubjectJudgement = Judgement & { tpc_id: string; tpc_name: string; percent: number };
 export type Readiness = { passed: boolean; overall: Judgement | null; subjects: SubjectJudgement[] };
 export type Pace = { used_seconds: number; limit_seconds: number; avg_seconds_per_question: number; target_seconds_per_question: number };
@@ -19,6 +29,8 @@ function normalize(r: Readiness | Judgement): Readiness {
 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`;
 const amount = (j: Judgement, n: number) => (j.unit === "points" ? `${formatScore(n)} คะแนน` : `${n} ข้อ`);
+// เกณฑ์ที่ตั้งเป็นขั้นต่ำต้องอ่านเป็น "30 ข้อ" ไม่ใช่ % ที่แปลงมา (ลูกค้าเทียบกับประกาศของสนามสอบตรงๆ ได้)
+const criterionText = (j: Judgement) => (j.mode === "min" ? amount(j, j.required) : `${j.pass_percent}%`);
 
 // เวลา: โหมดจับเวลาใช้เกินกำหนดไม่ได้อยู่แล้ว เฉลี่ยจึงไม่มีทางเกินเป้า — สิ่งที่มีประโยชน์จริงคือ "หมดเวลาก่อนทำครบไหม"
 function PaceRow({ pace, skippedCount }: { pace: Pace; skippedCount: number }) {
@@ -46,10 +58,10 @@ function PaceRow({ pace, skippedCount }: { pace: Pace; skippedCount: number }) {
 }
 
 // แถบคะแนนพร้อมเส้นเกณฑ์ — เห็นระยะห่างจากเส้นผ่านด้วยตา ไม่ต้องคิดเลข
-function ThresholdBar({ percent, passAt, passed, compact = false }: { percent: number; passAt: number; passed: boolean; compact?: boolean }) {
+function ThresholdBar({ percent, passAt, label, passed, compact = false }: { percent: number; passAt: number; label: string; passed: boolean; compact?: boolean }) {
     const fill = Math.min(100, Math.max(0, percent));
     return (
-        <div className={cn("relative", compact ? "mt-2" : "mt-5 mb-6")} role="img" aria-label={`ได้ ${Math.round(percent)}% เกณฑ์ผ่าน ${passAt}%`}>
+        <div className={cn("relative", compact ? "mt-2" : "mt-5 mb-6")} role="img" aria-label={`ได้ ${Math.round(percent)}% เกณฑ์ผ่าน ${label}`}>
             <div className={cn("rounded-full bg-white border border-slate-100 overflow-hidden", compact ? "h-1.5" : "h-2.5")}>
                 <div className={cn("h-full rounded-full", passed ? "bg-green-500" : "bg-red-400")} style={{ width: `${fill}%` }} />
             </div>
@@ -62,7 +74,7 @@ function ThresholdBar({ percent, passAt, passed, compact = false }: { percent: n
                     className="absolute top-5 -translate-x-1/2 whitespace-nowrap text-[11px] font-medium text-slate-600"
                     style={{ left: `clamp(2.5rem, ${passAt}%, calc(100% - 2.5rem))` }}
                 >
-                    เกณฑ์ {passAt}%
+                    เกณฑ์ {label}
                 </span>
             )}
         </div>
@@ -103,7 +115,9 @@ export default function ReadinessCard({
     const { passed, overall, subjects } = readiness;
     const criteria = [
         subjects.length > 0 && "ต้องผ่านทุกวิชา",
-        overall && `เกณฑ์รวม ${overall.pass_percent}% (อย่างน้อย ${amount(overall, overall.required)})`,
+        overall && (overall.mode === "min"
+            ? `เกณฑ์รวมอย่างน้อย ${amount(overall, overall.required)}`
+            : `เกณฑ์รวม ${overall.pass_percent}% (อย่างน้อย ${amount(overall, overall.required)})`),
     ].filter(Boolean).join(" · ");
 
     return (
@@ -121,7 +135,7 @@ export default function ReadinessCard({
                 </div>
             </div>
 
-            {overall && <ThresholdBar percent={scorePercent} passAt={overall.pass_percent} passed={overall.passed} />}
+            {overall && <ThresholdBar percent={scorePercent} passAt={overall.pass_percent} label={criterionText(overall)} passed={overall.passed} />}
 
             {subjects.length > 0 && (
                 <ul className={cn("flex flex-col gap-4", overall ? "border-t border-slate-200/70 pt-4" : "mt-5")}>
@@ -134,9 +148,13 @@ export default function ReadinessCard({
                                     {s.passed ? "ผ่าน" : `ขาด ${amount(s, s.gap)}`}
                                 </span>
                             </div>
-                            <ThresholdBar percent={s.percent} passAt={s.pass_percent} passed={s.passed} compact />
+                            <ThresholdBar percent={s.percent} passAt={s.pass_percent} label={criterionText(s)} passed={s.passed} compact />
                             <p className="mt-1 text-xs tabular-nums text-slate-400">
-                                ได้ <span className="font-medium text-slate-700">{s.percent}%</span> · เกณฑ์ {s.pass_percent}%
+                                ได้{" "}
+                                <span className="font-medium text-slate-700">
+                                    {s.mode === "min" && s.have !== undefined ? amount(s, s.have) : `${s.percent}%`}
+                                </span>{" "}
+                                · เกณฑ์ {criterionText(s)}
                             </p>
                         </li>
                     ))}

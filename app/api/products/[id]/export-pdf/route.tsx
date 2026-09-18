@@ -52,11 +52,12 @@ async function toPdfQuestion(q: RawQuestion): Promise<ExportPdfQuestion> {
 
 // สร้าง PDF ฝั่ง server เท่านั้น (ไม่ส่ง @react-pdf/renderer ไปที่ client bundle) — ยิงไป backend ผ่าน
 // authorizedFetch เพื่อแนบ customer JWT จาก httpOnly cookie (เหมือน Route Handler อื่นในโปรเจกต์นี้)
-// ?shuffle=0/?answers=1 ส่งต่อให้ backend ตัดสินใจโดยตรง (ดู exportPrintableQuestions)
+// ?shuffle=1/?answers=1 ส่งต่อให้ backend ตัดสินใจโดยตรง (ดู exportPrintableQuestions)
+// ไม่ส่งพารามิเตอร์มา = ไม่สลับ ไม่มีเฉลย — ตรงกับค่าเริ่มต้นของ popover ดาวน์โหลด (ExportPdfButton)
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
     const { searchParams } = new URL(req.url);
-    const shuffle = searchParams.get("shuffle") === "0" ? "0" : "1";
+    const shuffle = searchParams.get("shuffle") === "1" ? "1" : "0";
     const answers = searchParams.get("answers") === "1" ? "1" : "0";
 
     const res = await authorizedFetch(`/store/products/${id}/export-questions?shuffle=${shuffle}&answers=${answers}`);

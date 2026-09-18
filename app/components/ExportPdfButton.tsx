@@ -4,12 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { Download, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 
-// popover เล็กๆ ให้เลือกก่อนดาวน์โหลด — สลับลำดับข้อ/ตัวเลือก (default เปิด กันจำตำแหน่งคำตอบเหมือนหน้า
-// ทำข้อสอบจริง) และแสดงเฉลยเต็ม+วิธีคิด (default ปิด เพราะเป็นเนื้อหาหลักที่ขายอยู่ ให้ลูกค้าเลือกเองว่า
-// จะเอาออกไปด้วยไหม) ค่าที่เลือกถูกส่งเป็น query string ตรงไป Route Handler ที่ generate PDF จริง
+// popover เล็กๆ ให้เลือกก่อนดาวน์โหลด — สลับลำดับข้อ/ตัวเลือก และแสดงเฉลยเต็ม+วิธีคิด
+// **ค่าเริ่มต้นไม่ติ๊กทั้งคู่** (ผู้ใช้สั่ง 2026-09-18) — ได้ไฟล์ที่ลำดับข้อตรงกับในเว็บและไม่มีเฉลยปน
+// ซึ่งเป็นสิ่งที่คนกดดาวน์โหลดคาดหวังที่สุด ใครอยากสลับลำดับหรือเอาเฉลยไปด้วยค่อยติ๊กเอง
 export default function ExportPdfButton({ productId }: { productId: string }) {
     const [open, setOpen] = useState(false);
-    const [shuffleOrder, setShuffleOrder] = useState(true);
+    const [shuffleOrder, setShuffleOrder] = useState(false);
     const [withAnswers, setWithAnswers] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
     const [progress, setProgress] = useState(0);
