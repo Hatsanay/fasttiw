@@ -150,6 +150,13 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
                     เพราะสิ่งที่อยากรู้ทันทีหลังส่งคำตอบคือรอบนี้พัฒนาขึ้นไหม */}
                 <div className="mb-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-slate-400">
                     <span>ตอบถูก {correctCount} จาก {review.att_total_questions} ข้อ</span>
+                    {/* ชุดที่ใช้ระบบคะแนนต้องเห็นคะแนนคู่กับจำนวนข้อเสมอ (ผู้ใช้สั่ง 2026-09-18) — ข้อละกี่คะแนน
+                        ไม่เท่ากัน "ถูก 34 จาก 100 ข้อ" จึงบอกไม่ได้ว่าได้กี่คะแนน */}
+                    {scored && (
+                        <span>
+                            ได้ {formatScore(review.att_earned_score)} จาก {formatScore(review.att_max_score)} คะแนน
+                        </span>
+                    )}
                     {duration && <span>ใช้เวลา {duration}</span>}
                     {diff !== null && (
                         <span
@@ -174,13 +181,16 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
                         <div className="flex flex-col gap-2.5">
                             {review.topic_breakdown.map((t) => (
                                 <div key={t.tpc_id}>
-                                    <div className="mb-1 flex items-baseline justify-between gap-2 text-xs">
-                                        <span className="min-w-0 truncate text-slate-600">{t.tpc_name}</span>
+                                    {/* ชื่อหมวดยาวได้ (ชื่อวิชา ก.พ.) ให้ขึ้นบรรทัดใหม่แทนการตัดทิ้ง ตัวเลขชิดขวาเสมอ
+                                        หมวดของชุดที่ใช้ระบบคะแนนบอกคะแนนต่อท้ายจำนวนข้อด้วย */}
+                                    <div className="mb-1 flex flex-wrap items-baseline justify-between gap-x-2 text-xs">
+                                        <span className="min-w-0 text-slate-600">{t.tpc_name}</span>
                                         <span className="shrink-0 text-slate-400">
                                             <span className={cn("font-medium", t.accuracy < 50 ? "text-red-500" : "text-slate-600")}>
                                                 {t.accuracy}%
                                             </span>
                                             {" · ถูก "}{t.correct}/{t.total} ข้อ
+                                            {t.scored && ` · ${formatScore(t.earned)}/${formatScore(t.possible)} คะแนน`}
                                         </span>
                                     </div>
                                     <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
