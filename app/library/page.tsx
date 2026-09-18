@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { BookOpenCheck, FileQuestion } from "lucide-react";
+import { BookOpenCheck, ChevronRight, ClipboardList, FileQuestion, Timer } from "lucide-react";
 import Navbar from "@/app/components/Navbar";
 import Footer from "@/app/components/Footer";
 import ExportPdfButton from "@/app/components/ExportPdfButton";
@@ -36,7 +36,43 @@ export default async function LibraryPage() {
         <div className="flex flex-col min-h-screen">
             <Navbar />
             <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-10">
-                <h1 className="text-2xl font-semibold text-slate-800 mb-8">คลังข้อสอบของฉัน</h1>
+                <h1 className="text-2xl font-semibold text-slate-800 mb-6">คลังข้อสอบของฉัน</h1>
+
+                {/* ทางเข้าสนามสอบเสมือนจริง — ขึ้นเฉพาะคนที่มีสิทธิ์อยู่แล้ว (หน้านี้ต้องล็อกอินและมีชุดข้อสอบ) */}
+                {entitlements.length > 0 && (
+                    <Link href="/exam/mock" className="mb-8 block">
+                        <Card className="flex items-center gap-4 p-5 transition-colors hover:border-brand-200">
+                            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
+                                <Timer size={20} />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                                <span className="block font-medium text-slate-800">สนามสอบเสมือนจริง</span>
+                                <span className="mt-0.5 block text-xs text-slate-400">
+                                    ซ้อมทั้งสนามในรอบเดียว จับเวลา ตัดผ่านรายวิชา — ข้อสุ่มใหม่ทุกครั้งจากทุกชุดที่คุณมี
+                                </span>
+                            </span>
+                            <ChevronRight size={18} className="shrink-0 text-slate-300" />
+                        </Card>
+                    </Link>
+                )}
+
+                {/* แผนทบทวนรายวัน — ทางเข้าหลักของการทบทวนข้อที่เคยพลาด */}
+                {entitlements.length > 0 && (
+                    <Link href="/review" className="mb-8 block">
+                        <Card className="flex items-center gap-4 p-5 transition-colors hover:border-brand-200">
+                            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                                <ClipboardList size={20} />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                                <span className="block font-medium text-slate-800">แผนทบทวนวันนี้</span>
+                                <span className="mt-0.5 block text-xs text-slate-400">
+                                    ทบทวนข้อที่เคยพลาดวันละนิด ระบบนัดทวนซ้ำให้เองจนกว่าจะจำได้จริง
+                                </span>
+                            </span>
+                            <ChevronRight size={18} className="shrink-0 text-slate-300" />
+                        </Card>
+                    </Link>
+                )}
 
                 {entitlements.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-24 text-slate-400">

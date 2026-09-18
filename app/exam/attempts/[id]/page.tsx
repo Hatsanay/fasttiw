@@ -16,7 +16,8 @@ export default async function ExamAttemptPage({ params }: { params: Promise<{ id
     // ชุดที่ถูกยกเลิกไปแล้วไม่มีอะไรให้ทำต่อ (ตอบ/ส่งคำตอบจะโดน backend ปฏิเสธหมดเพราะไม่ใช่ in_progress) —
     // พาไปหน้าเลือกโหมดของ product เดิมแทน เผื่อเข้าผ่าน URL เก่า/ปุ่ม back หลังกดยกเลิกไปแล้ว
     if (attempt.att_status === "abandoned") {
-        redirect(`/exam/${attempt.att_product_id}`);
+        // ใบสนามสอบเสมือนไม่มีชุดข้อสอบให้กลับไป — พาไปหน้ารายการสนามสอบแทน
+        redirect(attempt.att_mock_exam_id ? "/exam/mock" : `/exam/${attempt.att_product_id}`);
     }
 
     return (

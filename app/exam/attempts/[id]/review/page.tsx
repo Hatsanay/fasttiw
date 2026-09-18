@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Check, X, MinusCircle, ListChecks, ChevronRight, RotateCcw, TrendingUp, TrendingDown } from "lucide-react";
+import { Check, X, MinusCircle, ListChecks, ChevronRight, RotateCcw, TrendingUp, TrendingDown, Users } from "lucide-react";
 import Navbar from "@/app/components/Navbar";
 import Footer from "@/app/components/Footer";
 import Card from "@/components/ui/Card";
@@ -54,6 +54,8 @@ type Review = {
     // null = ชุดนี้ไม่ได้ตั้งเกณฑ์ผ่าน / ไม่ใช่โหมดจับเวลา (ดู ReadinessCard)
     readiness: Readiness | null;
     pace: Pace | null;
+    // null = คนทำชุดนี้ยังน้อยเกินกว่าจะเทียบได้อย่างมีความหมาย (backend ซ่อนให้เอง)
+    peer_comparison: { peers: number; better_than_percent: number; average_score: number } | null;
     topic_breakdown: TopicResult[];
     questions: ReviewQuestion[];
 };
@@ -128,6 +130,29 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
                     scorePercent={Number(review.att_score)}
                     skippedCount={skippedCount}
                 />
+
+                {/* เทียบกับคนอื่นแบบไม่เปิดเผยตัว — ไม่มีชื่อ ไม่มีอันดับ เป็นค่าสถิติล้วน
+                    สนามที่แข่งกับคนอื่น (เช่น ก.พ.) "ได้กี่ %" อย่างเดียวไม่บอกว่าพอหรือยัง */}
+                {review.peer_comparison && (
+                    <Card className="mb-4 flex items-center gap-4 p-5">
+                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
+                            <Users size={20} />
+                        </span>
+                        <div className="min-w-0">
+                            <p className="text-sm text-slate-700">
+                                คะแนนครั้งนี้สูงกว่า{" "}
+                                <span className="text-lg font-semibold text-brand-600 tabular-nums">
+                                    {review.peer_comparison.better_than_percent}%
+                                </span>{" "}
+                                ของคนที่ทำชุดนี้
+                            </p>
+                            <p className="mt-0.5 text-xs text-slate-400 tabular-nums">
+                                เทียบกับ {review.peer_comparison.peers} คน · คะแนนเฉลี่ยของคนอื่น {review.peer_comparison.average_score}%
+                                · นับคนละครั้งที่ดีที่สุด ไม่มีการเปิดเผยว่าใครได้เท่าไหร่
+                            </p>
+                        </div>
+                    </Card>
+                )}
 
                 {/* สรุปผลครั้งนี้ — วางไว้บนสุดก่อนข้อ 1 ตามที่ผู้ใช้ระบุ
                     เดิมหน้านี้บอกแค่ % แล้วโยนรายการคำถามใส่ทันที ผู้ใช้ต้องไล่นับเองว่าผิดกี่ข้อ พลาดหมวดไหน */}

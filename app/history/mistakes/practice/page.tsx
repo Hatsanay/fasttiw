@@ -13,13 +13,16 @@ export const metadata = { title: "ทำใหม่ข้อที่เคย�
 export default async function MistakePracticePage({
     searchParams,
 }: {
-    searchParams: Promise<{ product_id?: string; topic_id?: string }>;
+    searchParams: Promise<{ product_id?: string; topic_id?: string; plan?: string }>;
 }) {
     const sp = await searchParams;
     const filter = new URLSearchParams();
     if (sp.product_id) filter.set("product_id", sp.product_id);
     if (sp.topic_id) filter.set("topic_id", sp.topic_id);
-    const backHref = `/history/mistakes${filter.size ? `?${filter}` : ""}`;
+    // โหมดแผนวันนี้ (2026-09-18): รวมข้อที่ถึงกำหนดทวนซ้ำเข้ามาด้วย ไม่ใช่เฉพาะข้อที่ยังตอบผิด
+    const planMode = sp.plan === "1";
+    if (planMode) filter.set("plan", "1");
+    const backHref = planMode ? "/review" : `/history/mistakes${filter.size ? `?${filter}` : ""}`;
 
     const res = await authorizedFetch(`/store/me/mistakes/practice${filter.size ? `?${filter}` : ""}`, { cache: "no-store" });
     const { questions, remaining, locked }: { questions: PracticeQuestion[]; remaining: number; locked: number } =
@@ -31,7 +34,7 @@ export default async function MistakePracticePage({
             <main className="flex-1 max-w-2xl mx-auto w-full px-4 sm:px-6 py-8">
                 <Link href={backHref} className="mb-4 inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-600">
                     <ArrowLeft size={15} />
-                    กลับไปหน้าข้อที่ต้องทบทวน
+                    {planMode ? "กลับไปหน้าแผนทบทวน" : "กลับไปหน้าข้อที่ต้องทบทวน"}
                 </Link>
                 {questions.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-24 text-center text-slate-400">
