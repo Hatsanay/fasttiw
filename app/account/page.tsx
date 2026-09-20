@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { KeyRound, UserRound, Laptop, ShieldAlert } from "lucide-react";
+import { KeyRound, UserRound, Laptop, ShieldAlert, History } from "lucide-react";
 import Navbar from "@/app/components/Navbar";
 import Footer from "@/app/components/Footer";
 import Card from "@/components/ui/Card";
@@ -8,18 +8,22 @@ import ProfileForm from "./ProfileForm";
 import PasswordForm from "./PasswordForm";
 import AvatarUpload from "./AvatarUpload";
 import SessionList from "./SessionList";
+import LoginHistory, { type LoginEvent } from "./LoginHistory";
 import DeletionRequestButton from "./DeletionRequestButton";
 
 export const metadata = { title: "บัญชีของฉัน" };
 
 export default async function AccountPage() {
-    const [res, sessionsRes] = await Promise.all([
+    const [res, sessionsRes, historyRes] = await Promise.all([
         authorizedFetch("/store/me"),
         authorizedFetch("/store/me/sessions"),
+        authorizedFetch("/store/me/login-history"),
     ]);
     if (!res.ok) notFound();
     const profile = await res.json();
     const { data: sessions } = sessionsRes.ok ? await sessionsRes.json() : { data: [] };
+    // ประวัติโหลดไม่ได้ไม่ควรทำให้ทั้งหน้าพัง — ส่วนอื่นของหน้าบัญชียังต้องใช้งานได้ตามปกติ
+    const { data: loginEvents } = historyRes.ok ? await historyRes.json() : { data: [] as LoginEvent[] };
 
     return (
         <div className="flex flex-col min-h-screen">
@@ -59,6 +63,19 @@ export default async function AccountPage() {
                         </div>
                         <p className="text-xs text-slate-400 mb-4">เข้าสู่ระบบพร้อมกันได้สูงสุด 2 เครื่อง เข้าเครื่องใหม่เกินโควตาจะเตะเครื่องเก่าสุดออกอัตโนมัติ</p>
                         <SessionList sessions={sessions} />
+                    </Card>
+
+                    <Card className="p-5 sm:p-6">
+                        <div className="flex items-center gap-2 mb-1">
+                            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
+                                <History size={16} />
+                            </span>
+                            <h2 className="font-medium text-slate-800">ประวัติการเข้าสู่ระบบ</h2>
+                        </div>
+                        <p className="text-xs text-slate-400 mb-4">
+                            90 วันล่าสุด — ถ้าเห็นรายการที่ไม่ใช่คุณ ให้เปลี่ยนรหัสผ่านทันทีและตัดอุปกรณ์อื่นออกจากระบบ
+                        </p>
+                        <LoginHistory events={loginEvents} />
                     </Card>
 
                     <Card className="p-5 sm:p-6">
