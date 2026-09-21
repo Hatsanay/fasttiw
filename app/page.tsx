@@ -7,6 +7,7 @@ import Hero from "@/app/components/Hero";
 import Reveal from "@/app/components/Reveal";
 import CategoryShowcase from "@/app/components/CategoryShowcase";
 import OutcomeProof from "@/app/components/OutcomeProof";
+import JourneyMockups from "@/app/components/JourneyMockups";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import NewsFeedCard from "@/app/news/NewsFeedCard";
@@ -230,6 +231,10 @@ export default async function HomePage() {
                         </div>
                     </div>
                 </section>
+
+                {/* 3 อย่างที่เกิดขึ้นหลังซื้อแล้ว (ผ่านไหม / แผนวันนี้ / สนามสอบเสมือน) — วางก่อนบล็อกผลสอบจริง
+                    โดยตั้งใจ: บอกว่าระบบทำอะไรให้ก่อน แล้วค่อยตามด้วยหลักฐานว่าได้ผลจริง */}
+                <JourneyMockups />
 
                 {/* ผลสอบจริงจากลูกค้า — วางต่อจากบล็อกจุดเด่นโดยตั้งใจ: พูดว่าเราดียังไงไปแล้ว
                     ตรงนี้คือหลักฐาน · ไม่มีข้อมูลถึงเกณฑ์ = ไม่เรนเดอร์อะไรเลย หน้าเดิมเหมือนเดิมเป๊ะ */}
