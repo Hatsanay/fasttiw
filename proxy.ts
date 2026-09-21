@@ -26,7 +26,11 @@ export default function proxy(req: NextRequest) {
     const { pathname } = req.nextUrl;
     const loggedIn = hasValidLookingSession(req);
 
-    if (PROTECTED_PREFIXES.some((p) => pathname.startsWith(p)) && !loggedIn) {
+    // เทียบเป็น "ช่วงของ path" ไม่ใช่ startsWith ดิบๆ — ไม่งั้น /exam-result (หน้าตอบแบบสอบถามผลสอบ
+    // ที่ลูกค้ากดจากลิงก์ในอีเมลโดยไม่ต้องล็อกอิน) จะถูกนับว่าอยู่ใต้ /exam แล้วโดนเด้งไปหน้า login ทุกครั้ง
+    const isUnder = (prefix: string) => pathname === prefix || pathname.startsWith(`${prefix}/`);
+
+    if (PROTECTED_PREFIXES.some(isUnder) && !loggedIn) {
         const url = new URL("/login", req.url);
         url.searchParams.set("next", pathname);
         return NextResponse.redirect(url);

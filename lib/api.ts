@@ -193,3 +193,24 @@ export function compareAtPrice(item: { prod_price: string | number; prod_compare
     const compare = Number(item.prod_compare_price) || 0;
     return compare > effectivePrice(item) ? compare : null;
 }
+
+// ผลสอบจริงที่ลูกค้าแจ้งกลับมา (ดู ../CLAUDE.md ข้อ 6.7)
+//
+// **backend เป็นคนตัดสินว่าจะเปิดเผยหรือไม่** (ต้องมีผู้รู้ผลครบเกณฑ์ก่อน) ฝั่งนี้แค่ทำตาม —
+// ห้ามเอา responses/passed มาคำนวณเองเพื่อแสดงตอน available=false เพราะกติกาจะเพี้ยนไปคนละทางทันที
+export type OutcomeStats = {
+    available: boolean;
+    responses?: number;
+    passed?: number;
+    pass_rate?: number;
+    testimonials: { name: string | null; comment: string; outcome: "passed" | "failed"; round_name: string }[];
+};
+
+export async function getOutcomeStats(): Promise<OutcomeStats> {
+    // revalidate 10 นาที — ตัวเลขนี้ขยับช้ามาก (เปลี่ยนตอนลูกค้าตอบแบบสอบถามเท่านั้น)
+    // แต่หน้าแรกคือหน้าที่คนเข้าเยอะที่สุด ไม่ควรยิง backend ใหม่ทุกครั้ง
+    const res = await fetch(`${API_URL}/store/outcome-stats`, { next: { revalidate: 600 } }).catch(() => null);
+    // ดึงไม่ได้ = ไม่แสดงอะไรเลย ดีกว่าทำให้หน้าแรกพังทั้งหน้า
+    if (!res?.ok) return { available: false, testimonials: [] };
+    return res.json();
+}

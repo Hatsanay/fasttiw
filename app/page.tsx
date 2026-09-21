@@ -6,10 +6,11 @@ import ProductCard from "@/app/components/ProductCard";
 import Hero from "@/app/components/Hero";
 import Reveal from "@/app/components/Reveal";
 import CategoryShowcase from "@/app/components/CategoryShowcase";
+import OutcomeProof from "@/app/components/OutcomeProof";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import NewsFeedCard from "@/app/news/NewsFeedCard";
-import { getPublicProducts, getPublicCategories, getPopularProducts, getLandingNewsBlocks } from "@/lib/api";
+import { getPublicProducts, getPublicCategories, getPopularProducts, getLandingNewsBlocks, getOutcomeStats } from "@/lib/api";
 import { SITE_URL } from "@/lib/site";
 import { getDiagnosticCategories } from "@/lib/diagnostic";
 import { cn } from "@/lib/cn";
@@ -57,12 +58,13 @@ export const metadata = {
 };
 
 export default async function HomePage() {
-    const [{ data: products }, categories, popularProducts, landingNews, diagnosticCategories] = await Promise.all([
+    const [{ data: products }, categories, popularProducts, landingNews, diagnosticCategories, outcomeStats] = await Promise.all([
         getPublicProducts({ limit: 100 }),
         getPublicCategories(),
         getPopularProducts(),
         getLandingNewsBlocks(),
         getDiagnosticCategories(),
+        getOutcomeStats(),
     ]);
 
     // structured data ระดับเว็บไซต์ — บอก Google ว่าเว็บนี้คือใคร (Organization) และเป็นเว็บไซต์ชื่ออะไร
@@ -228,6 +230,10 @@ export default async function HomePage() {
                         </div>
                     </div>
                 </section>
+
+                {/* ผลสอบจริงจากลูกค้า — วางต่อจากบล็อกจุดเด่นโดยตั้งใจ: พูดว่าเราดียังไงไปแล้ว
+                    ตรงนี้คือหลักฐาน · ไม่มีข้อมูลถึงเกณฑ์ = ไม่เรนเดอร์อะไรเลย หน้าเดิมเหมือนเดิมเป๊ะ */}
+                <OutcomeProof stats={outcomeStats} />
 
                 {/* Categories */}
                 {categories.length > 0 && (
