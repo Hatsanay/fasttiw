@@ -1,16 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { memo, startTransition, useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Check, X, Clock, ChevronLeft, ChevronRight, LogOut, Trash2, Flag, TriangleAlert, PanelRightOpen, PanelRightClose } from "lucide-react";
 import { cn } from "@/lib/cn";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
-import QuestionImage from "@/app/components/QuestionImage";
-import ChoiceImage from "@/app/components/ChoiceImage";
+import QuestionImage, { preloadQuestionImage } from "@/app/components/QuestionImage";
+import ChoiceImage, { preloadChoiceImage } from "@/app/components/ChoiceImage";
 import { submitAnswerAction, submitAttemptAction, abandonAttemptAction, type AnswerReveal } from "@/app/actions/exam";
 import { hasScoring, formatScore } from "@/lib/scoring";
+import { MathText } from "@/lib/mathClient";
 
 type Question = {
     ques_id: string;
@@ -39,7 +40,150 @@ function formatClock(totalSeconds: number): string {
     return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
+// ตัวนับเวลาถอยหลัง (2026-09-25) — **แยกเป็น component ของตัวเองโดยตั้งใจ** เดิม state วินาทีอยู่ใน ExamRunner
+// ทำให้ทั้งหน้าเรนเดอร์ใหม่ทุกวินาที วัดบนมือถือจำลองในโหมด "แสดงทุกข้อ" (282 ข้อ) ได้ ~90ms ต่อวินาที = จอกระตุก
+// ทุกวินาทีตอนเลื่อนอ่าน ตอนนี้เรนเดอร์ใหม่แค่ตัวเลขตัวเดียว
+// เริ่มที่ null เสมอทั้งฝั่ง server และ client (ไม่เรียก Date.now() ตอน render) — ถ้าคำนวณค่าเริ่มต้นจาก Date.now()
+// ตรงๆ ค่าที่ได้ตอน SSR กับตอน hydrate จะไม่ตรงกันเป๊ะ เกิด hydration mismatch
+function Countdown({ deadline, onExpire }: { deadline: number; onExpire: () => void }) {
+    const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
+    // เรียก onExpire ตัวล่าสุดเสมอ โดยไม่ต้องตั้ง interval ใหม่ทุกครั้งที่ parent เรนเดอร์
+    const fireExpire = useEffectEvent(onExpire);
+
+    useEffect(() => {
+        const tick = () => {
+            const remaining = Math.round((deadline - Date.now()) / 1000);
+            setRemainingSeconds(remaining);
+            return remaining;
+        };
+        if (tick() <= 0) {
+            fireExpire();
+            return;
+        }
+        const interval = setInterval(() => {
+            if (tick() <= 0) {
+                clearInterval(interval);
+                fireExpire();
+            }
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [deadline]);
+
+    if (remainingSeconds === null) return <span />;
+    return (
+        <span className={cn("flex items-center gap-1.5 font-medium", remainingSeconds < 60 ? "text-red-500" : "text-slate-600")}>
+            <Clock size={16} />
+            {formatClock(remainingSeconds)}
+        </span>
+    );
+}
+
+// เนื้อหาการ์ดคำถาม 1 ข้อ — ใช้ร่วมกันทั้งโหมด "ทีละข้อ" (เรียกครั้งเดียวกับ question ปัจจุบัน) และ
+// โหมด "แสดงทุกข้อ" (เรียกวนทุกข้อ) showNumber โชว์เลขข้อในการ์ดเฉพาะโหมดหลัง เพราะโหมดทีละข้อมีแถบ
+// บนสุด "ข้อ N จาก M" บอกอยู่แล้ว ไม่ต้องซ้ำ
+//
+// **memo โดยตั้งใจ** (2026-09-25) — โหมด "แสดงทุกข้อ" มีการ์ดเป็นร้อยใบ เดิมกดตอบ/ปักหมุด 1 ข้อ ทุกใบเรนเดอร์ใหม่หมด
+// ตอนนี้เฉพาะใบที่ข้อมูลเปลี่ยน (q ใหม่ / isFlagged / locked) · onSelect/onToggleFlag ต้องเป็นฟังก์ชันที่ identity คงที่
+// (useCallback) ไม่งั้น memo ไม่มีผลเลย
+const QuestionCard = memo(function QuestionCard({
+    q,
+    displayNumber,
+    showNumber,
+    scored,
+    isFlagged,
+    locked,
+    onSelect,
+    onToggleFlag,
+}: {
+    q: Question;
+    displayNumber: number;
+    showNumber: boolean;
+    scored: boolean;
+    isFlagged: boolean;
+    // โหมดฝึก: กดตอบไปแล้ว กำลังรอเฉลยจากเซิร์ฟเวอร์
+    locked: boolean;
+    onSelect: (q: Question, choiceId: string) => void;
+    onToggleFlag: (quesId: string) => void;
+}) {
+    return (
+        <Card className="p-6 flex-1 flex flex-col">
+            <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                    {showNumber && <p className="text-sm font-medium text-brand-600">ข้อที่ {displayNumber}</p>}
+                    {scored && (
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
+                            {formatScore(q.ques_score)} คะแนน
+                        </span>
+                    )}
+                </div>
+                <button
+                    type="button"
+                    onClick={() => onToggleFlag(q.ques_id)}
+                    title={isFlagged ? "เอาปักหมุดออก" : "ปักหมุดไว้ทบทวน"}
+                    className={cn(
+                        "flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium transition-colors",
+                        isFlagged ? "text-amber-500 hover:bg-amber-50" : "text-slate-300 hover:text-slate-400 hover:bg-slate-50"
+                    )}
+                >
+                    <Flag size={15} className={isFlagged ? "fill-amber-400" : ""} />
+                </button>
+            </div>
+            <QuestionImage src={q.ques_image_url} />
+            <h1 className="text-lg font-medium text-slate-900 mb-6 leading-relaxed whitespace-pre-line"><MathText text={q.ques_text} /></h1>
+
+            <div className="flex flex-col gap-3">
+                {q.choices.map((choice) => {
+                    const isSelected = q.selected_choice_id === choice.cho_id;
+                    const reason = q.reveal?.choice_reasons.find((r) => r.cho_id === choice.cho_id);
+                    const isRevealedCorrect = q.reveal && reason?.is_correct;
+                    const isRevealedWrongSelected = q.reveal && isSelected && !reason?.is_correct;
+
+                    return (
+                        <div key={choice.cho_id}>
+                            <button
+                                type="button"
+                                onClick={() => onSelect(q, choice.cho_id)}
+                                disabled={locked || !!q.reveal}
+                                className={cn(
+                                    "w-full text-left px-4 py-3 rounded-xl border-2 transition-all active:scale-[0.98] flex items-start justify-between gap-3",
+                                    "disabled:cursor-default",
+                                    isRevealedCorrect && "border-green-400 bg-green-50",
+                                    isRevealedWrongSelected && "border-red-300 bg-red-50",
+                                    !q.reveal && isSelected && "border-brand-500 bg-brand-50/50",
+                                    !q.reveal && !isSelected && "border-slate-200 hover:border-slate-300",
+                                    !isRevealedCorrect && !isRevealedWrongSelected && q.reveal && "border-slate-100 text-slate-400"
+                                )}
+                            >
+                                <span className="flex-1">
+                                    <ChoiceImage src={choice.cho_image_url} />
+                                    <MathText text={choice.cho_text} />
+                                </span>
+                                {isRevealedCorrect && <Check size={18} className="text-green-600 shrink-0" />}
+                                {isRevealedWrongSelected && <X size={18} className="text-red-500 shrink-0" />}
+                            </button>
+                            {q.reveal && !reason?.is_correct && reason?.wrong_reason && (
+                                <p className={cn("text-xs mt-1.5 px-1", isSelected ? "text-red-500" : "text-slate-400")}>
+                                    <MathText text={reason.wrong_reason} />
+                                </p>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+
+            {q.reveal && (
+                <div className="mt-6 p-4 rounded-xl bg-brand-50/60 border border-brand-100">
+                    <p className="text-sm font-medium text-brand-700 mb-1.5">วิธีคิด</p>
+                    <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-line">{q.reveal.explanation ? <MathText text={q.reveal.explanation} /> : "ไม่มีคำอธิบายเพิ่มเติม"}</p>
+                </div>
+            )}
+        </Card>
+    );
+});
+
 const VIEW_MODE_STORAGE_KEY = "examViewMode";
+// จำนวนการ์ดต่อก้อนในโหมด "แสดงทุกข้อ" — ก้อนแรกเต็มจอมือถือหลายหน้าจอแล้ว และแต่ละก้อนสั้นพอไม่ให้จอค้างจนรู้สึกได้
+const ALL_VIEW_CHUNK = 12;
 // ปักหมุดเป็นแค่ตัวช่วยจำระหว่างทำข้อสอบรอบนี้ ไม่ต้องเก็บฝั่ง backend (ไม่กระทบคะแนน/ผลลัพธ์ใดๆ) —
 // เก็บ localStorage แยกตาม attempt เพื่อไม่ให้ปักหมุดของ attempt เก่าไปปนกับ attempt ใหม่
 const flagStorageKey = (attId: string) => `examFlags:${attId}`;
@@ -54,19 +198,51 @@ export default function ExamRunner({ attempt }: { attempt: Attempt }) {
     const [flagged, setFlagged] = useState<Set<string>>(new Set());
     // แถบรายการข้อเริ่มต้นแบบย่อ (icon เดียว) เหมือน sidebar ที่พับไว้ กดถึงจะกางออกมาเต็ม
     const [navigatorOpen, setNavigatorOpen] = useState(false);
-    const [isPending, startTransition] = useTransition();
     const [isSubmitting, startSubmitTransition] = useTransition();
     const [showExitConfirm, setShowExitConfirm] = useState(false);
     const [showUnansweredConfirm, setShowUnansweredConfirm] = useState(false);
     const [isExiting, startExitTransition] = useTransition();
     const submittedRef = useRef(false);
-    // เก็บ promise ของการบันทึกคำตอบข้อล่าสุดไว้เสมอ — handleSubmit ต้องรอให้ตัวนี้จบก่อนเสมอ กัน race
-    // ที่ผู้ใช้เพิ่งกดเลือกคำตอบข้อสุดท้ายแล้วกด "ส่งคำตอบ" (หรือหมดเวลาพอดี) เร็วมากจน PUT บันทึกคำตอบ
-    // ยังไปไม่ถึง backend เลย ทำให้ข้อนั้นถูกส่งเป็น "ไม่ได้ตอบ" ทั้งที่ผู้ใช้เลือกคำตอบไปแล้วจริง
-    const pendingAnswerRef = useRef<Promise<unknown>>(Promise.resolve());
+
+    // ── บันทึกคำตอบแบบไม่ให้ผู้ใช้รอ (2026-09-25) ──────────────────────────────────────────────────────
+    // เดิมกดตัวเลือกแล้วจอไม่เปลี่ยนจนกว่าเซิร์ฟเวอร์ตอบกลับ (browser → Next → backend → กลับ) และทุกปุ่มถูกล็อก
+    // ระหว่างรอ — วัดบนมือถือจำลองได้ ~220ms ต่อการกด ถ้าสัญญาณมือถืออ่อนเป็นวินาที ลูกค้าไม่รู้ว่ากดติดไหม
+    // ตอนนี้จอเปลี่ยนทันทีที่กด แล้วบันทึกตามหลัง:
+    // - ต่อข้อ ส่งทีละคำขอ และส่งเฉพาะ "ตัวล่าสุดที่เลือก" — เปลี่ยนใจรัวๆ ก→ข→ค ไม่มีทางที่คำขอ ข จะไปถึงทีหลัง ค
+    //   แล้วทับค่าที่ถูก (เลือกค้างระหว่างรอก็ข้ามไปส่งตัวล่าสุดเลย ไม่ส่ง ข ทิ้งเปล่าๆ)
+    // - บันทึกไม่สำเร็จ → จอถอยกลับไปคำตอบล่าสุดที่บันทึกได้จริง + แจ้งเตือน (จอต้องไม่โกหกว่าบันทึกแล้ว)
+    // - ส่งคำตอบ/ออก/ยกเลิก ต้อง flushAnswers() ก่อนเสมอ ไม่งั้นข้อที่เพิ่งกดจะถูกส่งเป็น "ไม่ได้ตอบ"
+    // - โหมดฝึก: ล็อกข้อนั้นทันทีที่กดครั้งแรก (เหมือนเดิมที่ตอบได้ครั้งเดียว) เฉลยมาถึงตามหลังเสี้ยววินาที —
+    //   เฉลยยังต้องมาจากเซิร์ฟเวอร์เสมอ ห้ามส่งคำตอบที่ถูกมาไว้ในหน้าล่วงหน้า (เปิดดูได้จาก devtools)
+    const confirmedRef = useRef(new Map(attempt.questions.map((q) => [q.ques_id, q.selected_choice_id])));
+    const wantedRef = useRef(new Map<string, string>());
+    const savingRef = useRef(new Map<string, Promise<void>>());
+    const [lockedIds, setLockedIds] = useState<ReadonlySet<string>>(() => new Set());
     // ใช้เก็บ DOM ref ของการ์ดแต่ละข้อไว้ scroll ไปหาตอนกดเลขข้อในแถบด้านข้าง (โหมด "แสดงทุกข้อ" เท่านั้น
     // โหมด "ทีละข้อ" ไม่ต้องใช้ เพราะสลับ index ไปเลยตรงๆ)
     const questionRefs = useRef<Array<HTMLDivElement | null>>([]);
+
+    // โหมด "แสดงทุกข้อ" ค่อยๆ เรนเดอร์ทีละก้อน (2026-09-25) — เดิมสร้างการ์ดครบทุกข้อในครั้งเดียว วัดบนมือถือจำลอง
+    // ชุด 282 ข้อจอค้างนิ่ง 3.2 วินาที (บางรอบ 6.5 วิ) กดอะไรไม่ได้เลย · ตอนนี้ก้อนแรกขึ้นทันที ที่เหลือต่อท้ายทีละก้อน
+    // ในเบื้องหลัง แต่ละก้อนสั้นพอที่จอยังเลื่อน/กดได้ระหว่างนั้น · กดเลขข้อที่ยังไม่ถูกสร้าง = สร้างถึงข้อนั้นแล้วค่อย scroll
+    const [allViewCount, setAllViewCount] = useState(ALL_VIEW_CHUNK);
+    const pendingJumpRef = useRef<number | null>(null);
+
+    useEffect(() => {
+        if (viewMode !== "all" || allViewCount >= questions.length) return;
+        const timer = setTimeout(() => {
+            startTransition(() => setAllViewCount((c) => Math.min(c + ALL_VIEW_CHUNK, questions.length)));
+        }, 0);
+        return () => clearTimeout(timer);
+    }, [viewMode, allViewCount, questions.length]);
+
+    // กดเลขข้อที่ยังไม่ถูกสร้าง → scroll ไปหลังการ์ดข้อนั้นโผล่แล้ว (ดู handleJumpToQuestion)
+    useEffect(() => {
+        const target = pendingJumpRef.current;
+        if (target === null || target >= allViewCount) return;
+        pendingJumpRef.current = null;
+        questionRefs.current[target]?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, [allViewCount]);
 
     const question = questions[index];
     const answeredCount = questions.filter((q) => q.selected_choice_id).length;
@@ -80,17 +256,6 @@ export default function ExamRunner({ attempt }: { attempt: Attempt }) {
         if (!attempt.att_time_limit_minutes) return null;
         return new Date(attempt.att_started_at).getTime() + attempt.att_time_limit_minutes * 60_000;
     }, [attempt.att_started_at, attempt.att_time_limit_minutes]);
-
-    // เริ่มที่ null เสมอทั้งฝั่ง server และ client (ไม่เรียก Date.now() ตอน render) — ถ้าคำนวณค่าเริ่มต้นจาก
-    // Date.now() ตรงๆ ตั้งแต่ initial render ค่าที่ได้ตอน SSR กับตอน client hydrate จะไม่มีทางตรงกันเป๊ะ
-    // (ต่างกันตามเวลาที่ผ่านไประหว่าง render ทั้งสองฝั่ง) ทำให้ข้อความตัวเลขวินาทีไม่ตรงกัน เกิด hydration
-    // mismatch ค่าเริ่มต้นจริงจึงต้องตั้งใน useEffect ด้านล่าง (รันหลัง mount ฝั่ง client เท่านั้น) แทน
-    const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
-
-    useEffect(() => {
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- Date.now() ต้องรอ mount เท่านั้น กัน hydration mismatch
-        setRemainingSeconds(deadline ? Math.round((deadline - Date.now()) / 1000) : null);
-    }, [deadline]);
 
     useEffect(() => {
         const stored = localStorage.getItem(VIEW_MODE_STORAGE_KEY);
@@ -113,18 +278,30 @@ export default function ExamRunner({ attempt }: { attempt: Attempt }) {
     }, [attempt.att_id]);
 
     function handleViewModeChange(mode: "single" | "all") {
+        // เริ่มโหมดแสดงทุกข้อจากก้อนแรกเสมอ (ดู allViewCount) — กลับมาจากโหมดทีละข้อแล้วไม่ต้องสร้างการ์ดทั้งชุดรวดเดียว
+        if (mode === "all") setAllViewCount(ALL_VIEW_CHUNK);
         setViewMode(mode);
         localStorage.setItem(VIEW_MODE_STORAGE_KEY, mode);
     }
 
-    function handleToggleFlag(quesId: string) {
-        setFlagged((prev) => {
-            const next = new Set(prev);
-            if (next.has(quesId)) next.delete(quesId);
-            else next.add(quesId);
-            localStorage.setItem(flagStorageKey(attempt.att_id), JSON.stringify([...next]));
-            return next;
-        });
+    const handleToggleFlag = useCallback(
+        (quesId: string) => {
+            setFlagged((prev) => {
+                const next = new Set(prev);
+                if (next.has(quesId)) next.delete(quesId);
+                else next.add(quesId);
+                localStorage.setItem(flagStorageKey(attempt.att_id), JSON.stringify([...next]));
+                return next;
+            });
+        },
+        [attempt.att_id]
+    );
+
+    // รอให้ทุกคำตอบที่กำลังบันทึกอยู่เสร็จ (รวมที่เลือกเพิ่มระหว่างรอ) — ต้องเรียกก่อนส่ง/ออก/ยกเลิกเสมอ
+    async function flushAnswers() {
+        while (savingRef.current.size > 0) {
+            await Promise.allSettled([...savingRef.current.values()]);
+        }
     }
 
     function handleSubmit() {
@@ -132,8 +309,8 @@ export default function ExamRunner({ attempt }: { attempt: Attempt }) {
         submittedRef.current = true;
         startSubmitTransition(async () => {
             try {
-                // รอให้คำตอบข้อล่าสุดที่กำลังบันทึกอยู่ (ถ้ามี) เสร็จก่อนเสมอ ก่อนค่อยส่งคำตอบทั้งชุด
-                await pendingAnswerRef.current.catch(() => {});
+                // รอให้คำตอบที่กำลังบันทึกอยู่ (ถ้ามี) เสร็จก่อนเสมอ ก่อนค่อยส่งคำตอบทั้งชุด
+                await flushAnswers();
                 const result = await submitAttemptAction(attempt.att_id);
                 if ("error" in result) {
                     toast.error(result.error);
@@ -154,22 +331,22 @@ export default function ExamRunner({ attempt }: { attempt: Attempt }) {
     // บันทึกอัตโนมัติทันทีที่เลือกอยู่แล้ว (handleSelectChoice) กลับมาทำต่อได้ทีหลังผ่าน /library → เลือกโหมด
     // → startAttemptAction จะ resume attempt เดิมตัวนี้เอง (ไม่สร้างใหม่ ดู startOrResumeAttempt ฝั่ง backend)
     // เวลาของโหมดจับเวลาเป็น wall-clock เทียบกับ att_started_at อยู่แล้ว (ดู deadline ด้านบน) จึงเดินต่อเอง
-    // โดยอัตโนมัติไม่ต้องทำอะไรเพิ่ม รอ pendingAnswerRef ให้เสร็จก่อนเสมอ กันกดเลือกคำตอบข้อสุดท้ายแล้วกดออก
+    // โดยอัตโนมัติไม่ต้องทำอะไรเพิ่ม รอ flushAnswers ให้เสร็จก่อนเสมอ กันกดเลือกคำตอบข้อสุดท้ายแล้วกดออก
     // เร็วเกินจน PUT ยังไปไม่ถึง backend
     function handleSaveAndExit() {
         startExitTransition(async () => {
-            await pendingAnswerRef.current.catch(() => {});
+            await flushAnswers();
             router.push("/library");
         });
     }
 
     // ยกเลิกทำข้อสอบทั้งชุด (ไม่บันทึกไว้ทำต่อ) — เรียก abandonAttemptAction ตั้ง att_status เป็น abandoned
     // ฝั่ง backend ทำให้ครั้งหน้ากด "เริ่มทำข้อสอบ" ได้ attempt ใหม่ทั้งชุด (สุ่มลำดับข้อ/ตัวเลือกใหม่)
-    // แทนที่จะ resume ชุดนี้ต่อ — ยังรอ pendingAnswerRef ก่อนเสมอเพื่อไม่ให้ชนกับคำขอ abandon (แม้คำตอบ
+    // แทนที่จะ resume ชุดนี้ต่อ — ยังรอ flushAnswers ก่อนเสมอเพื่อไม่ให้ชนกับคำขอ abandon (แม้คำตอบ
     // ที่ pending อยู่จะไม่มีผลอะไรกับชุดที่ถูกยกเลิกแล้วก็ตาม)
     function handleAbandon() {
         startExitTransition(async () => {
-            await pendingAnswerRef.current.catch(() => {});
+            await flushAnswers();
             const result = await abandonAttemptAction(attempt.att_id);
             if ("error" in result) {
                 toast.error(result.error);
@@ -179,50 +356,92 @@ export default function ExamRunner({ attempt }: { attempt: Attempt }) {
         });
     }
 
+    // โหลดรูปของ 2 ข้อถัดไปไว้ก่อน (โหมดทีละข้อ) — กดข้อถัดไปแล้วรูปโจทย์ขึ้นทันที ไม่ต้องรอเน็ต วัดบนมือถือจำลอง
+    // เดิมรอ ~220ms ต่อข้อที่มีรูป (รูปทดสอบ 1KB — รูปตาราง/กราฟจริงนานกว่านี้) · fetchPriority low ไม่แย่งเน็ตกับของข้อปัจจุบัน
+    // ใช้ attempt.questions (รูปไม่เปลี่ยนระหว่างทำ) แทน state จะได้ไม่ยิงซ้ำทุกครั้งที่กดตอบ
     useEffect(() => {
-        if (deadline === null) return;
-        const interval = setInterval(() => {
-            const remaining = Math.round((deadline - Date.now()) / 1000);
-            setRemainingSeconds(remaining);
-            if (remaining <= 0) {
-                clearInterval(interval);
-                toast.message("หมดเวลาทำข้อสอบ กำลังส่งคำตอบอัตโนมัติ");
-                handleSubmit();
-            }
-        }, 1000);
-        return () => clearInterval(interval);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [deadline]);
+        if (viewMode !== "single") return;
+        for (const q of attempt.questions.slice(index + 1, index + 3)) {
+            preloadQuestionImage(q.ques_image_url);
+            for (const c of q.choices) preloadChoiceImage(c.cho_image_url);
+        }
+    }, [index, viewMode, attempt.questions]);
+
+    // หมดเวลา → ส่งอัตโนมัติ (ตัวนับเวลาอยู่ใน <Countdown> ของตัวเอง ดูเหตุผลที่ตัว component)
+    function handleExpire() {
+        toast.message("หมดเวลาทำข้อสอบ กำลังส่งคำตอบอัตโนมัติ");
+        handleSubmit();
+    }
+
+    // ส่งคำตอบของข้อนี้ไปบันทึก — ส่งทีละคำขอต่อข้อ วนจนกว่าค่าที่บันทึกแล้วตรงกับตัวล่าสุดที่ผู้ใช้เลือก
+    // (ดูหลักการที่คอมเมนต์ "บันทึกคำตอบแบบไม่ให้ผู้ใช้รอ" ด้านบน)
+    const saveAnswer = useCallback(
+        (quesId: string) => {
+            if (savingRef.current.has(quesId)) return; // มีคำขอของข้อนี้ค้างอยู่ — ตัวที่ค้างจะวนมาส่งค่าล่าสุดเอง
+            const run = (async () => {
+                try {
+                    while (wantedRef.current.has(quesId) && wantedRef.current.get(quesId) !== confirmedRef.current.get(quesId)) {
+                        const choiceId = wantedRef.current.get(quesId)!;
+                        const result = await submitAnswerAction(attempt.att_id, quesId, choiceId);
+                        if ("error" in result) throw new Error(result.error);
+                        confirmedRef.current.set(quesId, result.selected_choice_id);
+                        // โหมดฝึก: เฉลยมากับคำตอบของเซิร์ฟเวอร์ · โหมดจับเวลา reveal เป็น null เสมอ
+                        if (result.reveal) {
+                            const reveal = result.reveal;
+                            setQuestions((prev) => prev.map((item) => (item.ques_id === quesId ? { ...item, reveal } : item)));
+                        }
+                    }
+                } catch (err) {
+                    // ถอยจอกลับไปคำตอบที่บันทึกได้จริงล่าสุด แล้วปลดล็อกให้กดใหม่ได้
+                    const confirmed = confirmedRef.current.get(quesId) ?? null;
+                    wantedRef.current.delete(quesId);
+                    setQuestions((prev) => prev.map((item) => (item.ques_id === quesId ? { ...item, selected_choice_id: confirmed } : item)));
+                    setLockedIds((prev) => {
+                        if (!prev.has(quesId)) return prev;
+                        const next = new Set(prev);
+                        next.delete(quesId);
+                        return next;
+                    });
+                    toast.error(err instanceof Error && err.message ? err.message : "บันทึกคำตอบไม่สำเร็จ กรุณาเลือกใหม่อีกครั้ง");
+                } finally {
+                    savingRef.current.delete(quesId);
+                }
+            })();
+            savingRef.current.set(quesId, run);
+        },
+        [attempt.att_id]
+    );
 
     // รับ question ตรงๆ แทนที่จะอิงจาก questions[index] เสมอ — โหมด "แสดงทุกข้อ" ผู้ใช้ตอบข้อไหนก่อนก็ได้
     // ไม่จำเป็นต้องเป็นข้อที่ index ปัจจุบันชี้อยู่
-    function handleSelectChoice(q: Question, choiceId: string) {
-        // โหมดฝึก + เปิดเฉลยแล้ว = ล็อกไม่ให้แก้คำตอบข้อนี้อีก (เห็นผลแล้วควรไปข้อถัดไป)
-        if (q.reveal) return;
-
-        const quesId = q.ques_id;
-        const promise = (async () => {
-            const result = await submitAnswerAction(attempt.att_id, quesId, choiceId);
-            if ("error" in result) {
-                toast.error(result.error);
-                return;
+    const handleSelectChoice = useCallback(
+        (q: Question, choiceId: string) => {
+            // โหมดฝึก: เปิดเฉลยแล้ว หรือกดไปแล้วกำลังรอเฉลย = ล็อกไม่ให้แก้คำตอบข้อนี้อีก
+            if (q.reveal) return;
+            if (attempt.att_mode === "practice") {
+                if (wantedRef.current.has(q.ques_id)) return;
+                setLockedIds((prev) => new Set(prev).add(q.ques_id));
             }
-            setQuestions((prev) =>
-                prev.map((item) => (item.ques_id === quesId ? { ...item, selected_choice_id: result.selected_choice_id, reveal: result.reveal } : item))
-            );
-        })();
-        pendingAnswerRef.current = promise;
+            if (q.selected_choice_id === choiceId && !savingRef.current.has(q.ques_id)) return; // กดตัวเดิมซ้ำ ไม่ต้องบันทึกใหม่
 
-        startTransition(() => promise);
-    }
+            wantedRef.current.set(q.ques_id, choiceId);
+            setQuestions((prev) => prev.map((item) => (item.ques_id === q.ques_id ? { ...item, selected_choice_id: choiceId } : item)));
+            saveAnswer(q.ques_id);
+        },
+        [attempt.att_mode, saveAnswer]
+    );
 
     // กดเลขข้อจากแถบนำทางด้านข้าง — โหมดทีละข้อสลับ index ตรงๆ, โหมดแสดงทุกข้อ scroll ไปหาการ์ดข้อนั้นแทน
-    // (ทุกข้อ render อยู่แล้วในหน้าเดียว ไม่มี "index ปัจจุบัน" ให้สลับ)
+    // (ทุกข้ออยู่ในหน้าเดียว ไม่มี "index ปัจจุบัน" ให้สลับ) — ข้อที่ยังไม่ถูกสร้าง (ดู allViewCount) สร้างถึงข้อนั้นก่อน
+    // แล้ว effect ด้านบนจะ scroll ให้หลังการ์ดโผล่
     function handleJumpToQuestion(i: number) {
         if (viewMode === "single") {
             setIndex(i);
-        } else {
+        } else if (i < allViewCount) {
             questionRefs.current[i]?.scrollIntoView({ behavior: "smooth", block: "start" });
+        } else {
+            pendingJumpRef.current = i;
+            setAllViewCount(i + 1);
         }
     }
 
@@ -247,87 +466,6 @@ export default function ExamRunner({ attempt }: { attempt: Attempt }) {
         setIndex((i) => i + 1);
     }
 
-    // เนื้อหาการ์ดคำถาม 1 ข้อ — ใช้ร่วมกันทั้งโหมด "ทีละข้อ" (เรียกครั้งเดียวกับ question ปัจจุบัน) และ
-    // โหมด "แสดงทุกข้อ" (เรียกวนทุกข้อ) showNumber โชว์เลขข้อในการ์ดเฉพาะโหมดหลัง เพราะโหมดทีละข้อมีแถบ
-    // บนสุด "ข้อ N จาก M" บอกอยู่แล้ว ไม่ต้องซ้ำ
-    function renderQuestionCard(q: Question, displayNumber: number, showNumber: boolean) {
-        const isFlagged = flagged.has(q.ques_id);
-        return (
-            <Card className="p-6 flex-1 flex flex-col">
-                <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                        {showNumber && <p className="text-sm font-medium text-brand-600">ข้อที่ {displayNumber}</p>}
-                        {scored && (
-                            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
-                                {formatScore(q.ques_score)} คะแนน
-                            </span>
-                        )}
-                    </div>
-                    <button
-                        type="button"
-                        onClick={() => handleToggleFlag(q.ques_id)}
-                        title={isFlagged ? "เอาปักหมุดออก" : "ปักหมุดไว้ทบทวน"}
-                        className={cn(
-                            "flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium transition-colors",
-                            isFlagged ? "text-amber-500 hover:bg-amber-50" : "text-slate-300 hover:text-slate-400 hover:bg-slate-50"
-                        )}
-                    >
-                        <Flag size={15} className={isFlagged ? "fill-amber-400" : ""} />
-                    </button>
-                </div>
-                <QuestionImage src={q.ques_image_url} />
-                <h1 className="text-lg font-medium text-slate-900 mb-6 leading-relaxed whitespace-pre-line">{q.ques_text}</h1>
-
-                <div className="flex flex-col gap-3">
-                    {q.choices.map((choice) => {
-                        const isSelected = q.selected_choice_id === choice.cho_id;
-                        const reason = q.reveal?.choice_reasons.find((r) => r.cho_id === choice.cho_id);
-                        const isRevealedCorrect = q.reveal && reason?.is_correct;
-                        const isRevealedWrongSelected = q.reveal && isSelected && !reason?.is_correct;
-
-                        return (
-                            <div key={choice.cho_id}>
-                                <button
-                                    type="button"
-                                    onClick={() => handleSelectChoice(q, choice.cho_id)}
-                                    disabled={isPending || !!q.reveal}
-                                    className={cn(
-                                        "w-full text-left px-4 py-3 rounded-xl border-2 transition-all active:scale-[0.98] flex items-start justify-between gap-3",
-                                        "disabled:cursor-default",
-                                        isRevealedCorrect && "border-green-400 bg-green-50",
-                                        isRevealedWrongSelected && "border-red-300 bg-red-50",
-                                        !q.reveal && isSelected && "border-brand-500 bg-brand-50/50",
-                                        !q.reveal && !isSelected && "border-slate-200 hover:border-slate-300",
-                                        !isRevealedCorrect && !isRevealedWrongSelected && q.reveal && "border-slate-100 text-slate-400"
-                                    )}
-                                >
-                                    <span className="flex-1">
-                                        <ChoiceImage src={choice.cho_image_url} />
-                                        {choice.cho_text}
-                                    </span>
-                                    {isRevealedCorrect && <Check size={18} className="text-green-600 shrink-0" />}
-                                    {isRevealedWrongSelected && <X size={18} className="text-red-500 shrink-0" />}
-                                </button>
-                                {q.reveal && !reason?.is_correct && reason?.wrong_reason && (
-                                    <p className={cn("text-xs mt-1.5 px-1", isSelected ? "text-red-500" : "text-slate-400")}>
-                                        {reason.wrong_reason}
-                                    </p>
-                                )}
-                            </div>
-                        );
-                    })}
-                </div>
-
-                {q.reveal && (
-                    <div className="mt-6 p-4 rounded-xl bg-brand-50/60 border border-brand-100">
-                        <p className="text-sm font-medium text-brand-700 mb-1.5">วิธีคิด</p>
-                        <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-line">{q.reveal.explanation ?? "ไม่มีคำอธิบายเพิ่มเติม"}</p>
-                    </div>
-                )}
-            </Card>
-        );
-    }
-
     return (
         <div className="max-w-2xl mx-auto w-full px-4 sm:px-6 py-8 flex-1 flex flex-col">
             {/* แถบบนสุด: ปุ่มออก + progress + ตัวจับเวลา */}
@@ -349,14 +487,7 @@ export default function ExamRunner({ attempt }: { attempt: Attempt }) {
                     )}
                     {scored && <span className="text-slate-400"> · เต็ม {formatScore(attempt.att_max_score)} คะแนน</span>}
                 </span>
-                {remainingSeconds !== null ? (
-                    <span className={cn("flex items-center gap-1.5 font-medium", remainingSeconds < 60 ? "text-red-500" : "text-slate-600")}>
-                        <Clock size={16} />
-                        {formatClock(remainingSeconds)}
-                    </span>
-                ) : (
-                    <span />
-                )}
+                {deadline !== null ? <Countdown deadline={deadline} onExpire={handleExpire} /> : <span />}
             </div>
             <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden mb-4">
                 <div
@@ -391,7 +522,7 @@ export default function ExamRunner({ attempt }: { attempt: Attempt }) {
 
             {viewMode === "single" ? (
                 <>
-                    {renderQuestionCard(question, index + 1, false)}
+                    <QuestionCard q={question} displayNumber={index + 1} showNumber={false} isFlagged={flagged.has(question.ques_id)} locked={lockedIds.has(question.ques_id)} scored={scored} onSelect={handleSelectChoice} onToggleFlag={handleToggleFlag} />
 
                     <div className="flex items-center justify-between mt-6">
                         <Button variant="secondary" onClick={() => setIndex((i) => i - 1)} disabled={index === 0}>
@@ -407,9 +538,9 @@ export default function ExamRunner({ attempt }: { attempt: Attempt }) {
             ) : (
                 <>
                     <div className="flex flex-col gap-6">
-                        {questions.map((q, i) => (
+                        {questions.slice(0, allViewCount).map((q, i) => (
                             <div key={q.ques_id} ref={(el) => { questionRefs.current[i] = el; }}>
-                                {renderQuestionCard(q, i + 1, true)}
+                                <QuestionCard q={q} displayNumber={i + 1} showNumber isFlagged={flagged.has(q.ques_id)} locked={lockedIds.has(q.ques_id)} scored={scored} onSelect={handleSelectChoice} onToggleFlag={handleToggleFlag} />
                             </div>
                         ))}
                     </div>
@@ -511,7 +642,7 @@ export default function ExamRunner({ attempt }: { attempt: Attempt }) {
                                     <LogOut size={22} />
                                 </span>
                             </div>
-                            <h2 className="text-lg font-bold text-slate-900">ออกจากข้อสอบตอนนี้?</h2>
+                            <h2 className="text-lg font-semibold text-slate-900">ออกจากข้อสอบตอนนี้?</h2>
                             <p className="text-sm text-slate-500 max-w-xs">
                                 คำตอบที่เลือกไว้บันทึกให้อัตโนมัติแล้ว กลับมาทำต่อได้ทีหลังที่หน้า &quot;คลังข้อสอบของฉัน&quot;
                                 {attempt.att_time_limit_minutes !== null && " เวลานับถอยหลังจะเดินต่อตามปกติแม้ไม่ได้เปิดหน้านี้ทิ้งไว้"}
@@ -554,7 +685,7 @@ export default function ExamRunner({ attempt }: { attempt: Attempt }) {
                                     <TriangleAlert size={22} />
                                 </span>
                             </div>
-                            <h2 className="text-lg font-bold text-slate-900">ยังตอบไม่ครบ {unansweredIndices.length} ข้อ</h2>
+                            <h2 className="text-lg font-semibold text-slate-900">ยังตอบไม่ครบ {unansweredIndices.length} ข้อ</h2>
                             <p className="text-sm text-slate-500 max-w-xs">แตะเลขข้อด้านล่างเพื่อกลับไปตอบ หรือส่งคำตอบตอนนี้เลยก็ได้</p>
                         </div>
 

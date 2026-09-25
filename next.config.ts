@@ -4,6 +4,9 @@ const apiOrigin = new URL(process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3
 const apiUrl = new URL(apiOrigin);
 
 const nextConfig: NextConfig = {
+  // หน้าสาธารณะ (หน้าแรก แคตตาล็อก แพ็กเกจ ฯลฯ) ถูกประกอบเป็นหน้าสำเร็จรูปล่วงหน้า ส่วนที่ขึ้นกับตัวลูกค้า
+  // (เมนูผู้ใช้ ป้าย "ซื้อแล้ว") ไหลตามมาในคำตอบเดียวกันผ่าน <Suspense> — ดูเหตุผลเต็มที่ ../CLAUDE.md ข้อ 5.5
+  cacheComponents: true,
   images: {
     remotePatterns: [
       {

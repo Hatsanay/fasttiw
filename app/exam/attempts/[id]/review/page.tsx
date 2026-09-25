@@ -13,6 +13,7 @@ import ReportQuestionButton from "@/app/components/ReportQuestionButton";
 import QuestionImage from "@/app/components/QuestionImage";
 import ChoiceImage from "@/app/components/ChoiceImage";
 import ReadinessCard, { type Readiness, type Pace } from "./ReadinessCard";
+import { MathText } from "@/lib/math";
 
 export const metadata = { title: "เฉลยข้อสอบ" };
 
@@ -271,7 +272,7 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
                                 <div className="flex items-start justify-between gap-3 mb-4">
                                     <h2 className="font-medium text-slate-900 leading-relaxed whitespace-pre-line">
                                         <span className="text-slate-400 mr-1.5">ข้อ {i + 1}.</span>
-                                        {q.ques_text}
+                                        <MathText text={q.ques_text} />
                                     </h2>
                                     <span
                                         className={cn(
@@ -304,14 +305,14 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
                                                 >
                                                     <span className="flex-1">
                                                         <ChoiceImage src={choice.cho_image_url} />
-                                                        {choice.cho_text}
+                                                        <MathText text={choice.cho_text} />
                                                     </span>
                                                     {reason?.is_correct && <Check size={15} className="text-green-600 shrink-0" />}
                                                     {isSelected && !reason?.is_correct && <X size={15} className="text-red-500 shrink-0" />}
                                                 </div>
                                                 {!reason?.is_correct && reason?.wrong_reason && (
                                                     <p className={cn("text-xs mt-1 px-1", isSelected ? "text-red-500" : "text-slate-400")}>
-                                                        {reason.wrong_reason}
+                                                        <MathText text={reason.wrong_reason} />
                                                     </p>
                                                 )}
                                             </div>
@@ -322,7 +323,7 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
                                 <div className="p-3.5 rounded-lg bg-brand-50/60 border border-brand-100 mb-3">
                                     <p className="text-xs font-medium text-brand-700 mb-1">วิธีคิด</p>
                                     <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-line">
-                                        {q.reveal.explanation ?? "ไม่มีคำอธิบายเพิ่มเติม"}
+                                        {q.reveal.explanation ? <MathText text={q.reveal.explanation} /> : "ไม่มีคำอธิบายเพิ่มเติม"}
                                     </p>
                                 </div>
 

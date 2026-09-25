@@ -11,9 +11,9 @@ import JourneyMockups from "@/app/components/JourneyMockups";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import NewsFeedCard from "@/app/news/NewsFeedCard";
-import { getPublicProducts, getPublicCategories, getPopularProducts, getLandingNewsBlocks, getOutcomeStats } from "@/lib/api";
+import { getPublicProducts, getPublicCategories, getPopularProducts, getLandingNewsBlocks, getOutcomeStats } from "@/lib/publicData";
 import { SITE_URL } from "@/lib/site";
-import { getDiagnosticCategories } from "@/lib/diagnostic";
+import { getDiagnosticCategories } from "@/lib/publicData";
 import { cn } from "@/lib/cn";
 
 // ภาพประกอบการ์ดแบบทดสอบวัดระดับ — สีและป้ายชุดเดียวกับหน้าผลจริง (DiagnosticResultView)

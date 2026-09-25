@@ -5,9 +5,11 @@ import Navbar from "@/app/components/Navbar";
 import Footer from "@/app/components/Footer";
 import ProductCard from "@/app/components/ProductCard";
 import SearchBox from "@/app/components/SearchBox";
-import { getPublicProducts, type Product } from "@/lib/api";
+import { type Product } from "@/lib/api";
+import { getPublicProducts } from "@/lib/publicData";
 import { SITE_URL } from "@/lib/site";
 import { getOwnedProductIds } from "@/lib/session";
+import { ProductGridSkeleton } from "@/components/ui/Skeleton";
 
 export const metadata = {
     title: "แนวข้อสอบทั้งหมด",
@@ -34,11 +36,43 @@ function groupByCategory(products: Product[]): { category: string; items: Produc
     return groups;
 }
 
-export default async function ProductsPage({
-    searchParams,
-}: {
-    searchParams: Promise<{ search?: string; category?: string; free?: string }>;
-}) {
+// จำนวนการ์ดที่โหลดปกทันที = ที่เห็นบนจอแรก (ดู eager ใน ProductCard)
+const EAGER_CARDS = 6;
+
+type ProductsSearchParams = Promise<{ search?: string; category?: string; free?: string }>;
+
+// โครงหน้า (navbar หัวข้อ ช่องค้นหา footer) อยู่ในหน้าสำเร็จรูปแสดงได้ทันที ส่วนรายการชุดข้อสอบขึ้นกับ
+// ?search=/?category=/?free= ใน URL จึงไหลตามมาใน <Suspense> (2026-09-24) · ข้อมูลรายการถูก cache ไว้แล้ว
+// (lib/publicData) ช่วงรอจึงสั้นมาก และรวมป้าย "ซื้อแล้ว" ไว้ในชิ้นเดียวกันเลย ไม่ต้องรอสองรอบ
+export default function ProductsPage({ searchParams }: { searchParams: ProductsSearchParams }) {
+    return (
+        <div className="flex flex-col min-h-screen">
+            <Navbar />
+            <main className="flex-1 max-w-360 mx-auto w-full px-4 sm:px-6 py-10">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+                    <h1 className="text-2xl font-semibold text-slate-800">แนวข้อสอบทั้งหมด</h1>
+                    <Suspense>
+                        <SearchBox />
+                    </Suspense>
+                </div>
+
+                <Suspense
+                    fallback={
+                        <>
+                            <div className="h-8.5 mb-6" />
+                            <ProductGridSkeleton />
+                        </>
+                    }
+                >
+                    <ProductResults searchParams={searchParams} />
+                </Suspense>
+            </main>
+            <Footer />
+        </div>
+    );
+}
+
+async function ProductResults({ searchParams }: { searchParams: ProductsSearchParams }) {
     const { search, category, free } = await searchParams;
     const isFreeOnly = free === "1";
     const [{ data: products }, ownedProductIds] = await Promise.all([
@@ -72,20 +106,11 @@ export default async function ProductsPage({
     };
 
     return (
-        <div className="flex flex-col min-h-screen">
+        <>
             <script
                 type="application/ld+json"
                 dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
             />
-            <Navbar />
-            <main className="flex-1 max-w-360 mx-auto w-full px-4 sm:px-6 py-10">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-                    <h1 className="text-2xl font-semibold text-slate-800">แนวข้อสอบทั้งหมด</h1>
-                    <Suspense>
-                        <SearchBox />
-                    </Suspense>
-                </div>
-
                 <div className="flex flex-wrap items-center gap-2 mb-6">
                     <Link
                         href={freeToggleHref}
@@ -114,22 +139,23 @@ export default async function ProductsPage({
                     </div>
                 ) : search || category || isFreeOnly ? (
                     <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
-                        {products.map((p) => (
-                            <ProductCard key={p.prod_id} product={p} owned={ownedProductIds.has(p.prod_id)} />
+                        {products.map((p, i) => (
+                            <ProductCard key={p.prod_id} product={p} owned={ownedProductIds.has(p.prod_id)} eager={i < EAGER_CARDS} />
                         ))}
                     </div>
                 ) : (
                     <div className="flex flex-col gap-12">
-                        {categoryGroups.map(({ category: groupCategory, items }) => (
+                        {categoryGroups.map(({ category: groupCategory, items }, groupIndex) => (
                             <section key={groupCategory} id={encodeURIComponent(groupCategory)} className="scroll-mt-20">
                                 <h2 className="text-lg font-semibold text-slate-800 mb-4">{groupCategory}</h2>
                                 <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
-                                    {items.map((p) => (
+                                    {items.map((p, i) => (
                                         <ProductCard
                                             key={p.prod_id}
                                             product={p}
                                             owned={ownedProductIds.has(p.prod_id)}
                                             hideCategoryBadge
+                                            eager={groupIndex === 0 && i < EAGER_CARDS}
                                         />
                                     ))}
                                 </div>
@@ -137,8 +163,6 @@ export default async function ProductsPage({
                         ))}
                     </div>
                 )}
-            </main>
-            <Footer />
-        </div>
+        </>
     );
 }

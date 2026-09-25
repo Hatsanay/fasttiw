@@ -633,7 +633,7 @@ export function PdfDownloadMockup() {
                     </div>
 
                     <div className="relative overflow-hidden p-5">
-                        <p className="pointer-events-none absolute inset-0 flex -rotate-12 items-center justify-center text-4xl font-bold text-slate-100 select-none">
+                        <p className="pointer-events-none absolute inset-0 flex -rotate-12 items-center justify-center text-4xl font-semibold text-slate-100 select-none">
                             FASTTIW
                         </p>
 

@@ -9,6 +9,7 @@ import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import QuestionImage from "@/app/components/QuestionImage";
 import ChoiceImage from "@/app/components/ChoiceImage";
+import { MathText } from "@/lib/mathClient";
 
 export type PracticeQuestion = {
     ques_id: string;
@@ -129,7 +130,7 @@ export default function MistakePractice({
                     {question.tpc_name && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-500">{question.tpc_name}</span>}
                 </div>
                 <QuestionImage src={question.ques_image_url} />
-                <h1 className="text-lg font-medium text-slate-900 mb-6 leading-relaxed whitespace-pre-line">{question.ques_text}</h1>
+                <h1 className="text-lg font-medium text-slate-900 mb-6 leading-relaxed whitespace-pre-line"><MathText text={question.ques_text} /></h1>
 
                 <div className="flex flex-col gap-3">
                     {question.choices.map((choice) => {
@@ -153,14 +154,14 @@ export default function MistakePractice({
                                 >
                                     <span className="flex-1">
                                         <ChoiceImage src={choice.cho_image_url} />
-                                        {choice.cho_text}
+                                        <MathText text={choice.cho_text} />
                                     </span>
                                     {pending === choice.cho_id && <Loader2 size={18} className="shrink-0 animate-spin text-brand-500" />}
                                     {result && isCorrect && <Check size={18} className="shrink-0 text-green-600" />}
                                     {result && isPicked && !isCorrect && <X size={18} className="shrink-0 text-red-500" />}
                                 </button>
                                 {result && !isCorrect && reason?.wrong_reason && (
-                                    <p className={cn("text-xs mt-1.5 px-1", isPicked ? "text-red-500" : "text-slate-400")}>{reason.wrong_reason}</p>
+                                    <p className={cn("text-xs mt-1.5 px-1", isPicked ? "text-red-500" : "text-slate-400")}><MathText text={reason.wrong_reason} /></p>
                                 )}
                             </div>
                         );
@@ -174,7 +175,7 @@ export default function MistakePractice({
                         </p>
                         <div className="mt-3 p-4 rounded-xl bg-brand-50/60 border border-brand-100">
                             <p className="text-sm font-medium text-brand-700 mb-1.5">วิธีคิด</p>
-                            <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-line">{result.reveal.explanation ?? "ไม่มีคำอธิบายเพิ่มเติม"}</p>
+                            <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-line">{result.reveal.explanation ? <MathText text={result.reveal.explanation} /> : "ไม่มีคำอธิบายเพิ่มเติม"}</p>
                         </div>
                     </>
                 )}

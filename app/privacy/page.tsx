@@ -9,13 +9,18 @@ export const metadata = {
 
 // ร่างนโยบายความเป็นส่วนตัวเบื้องต้นตาม PDPA — เป็นฉบับร่างสำหรับใช้งานจริงชั่วคราวเท่านั้น
 // ควรให้ทนายความตรวจสอบก่อนเผยแพร่ใช้งานจริง ตามที่ระบุไว้ใน CLAUDE.md ข้อ 8
+// วันที่ของตัวนโยบายเอง — **แก้ด้วยมือทุกครั้งที่แก้เนื้อหานโยบาย** (2026-09-24)
+// เดิมเป็น new Date() ซึ่งแสดง "วันนี้" ทุกครั้งที่มีคนเปิด = บอกผู้อ่านว่านโยบายเพิ่งเปลี่ยนทุกวัน ทั้งที่ไม่ได้เปลี่ยน
+// (ผิดในเชิง PDPA — ผู้ใช้ต้องรู้ได้ว่านโยบายที่ยินยอมไว้เปลี่ยนเมื่อไหร่) ใช้วันที่ไฟล์นี้ถูกแก้ครั้งล่าสุด
+const POLICY_UPDATED_AT = "20 กันยายน 2569";
+
 export default function PrivacyPolicyPage() {
     return (
         <div className="flex flex-col min-h-screen">
             <Navbar />
             <main className="flex-1 max-w-2xl mx-auto w-full px-4 sm:px-6 py-10">
                 <h1 className="text-2xl font-semibold text-slate-800 mb-2">นโยบายความเป็นส่วนตัว</h1>
-                <p className="text-sm text-slate-400 mb-8">ปรับปรุงล่าสุด: {new Date().toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" })}</p>
+                <p className="text-sm text-slate-400 mb-8">ปรับปรุงล่าสุด: {POLICY_UPDATED_AT}</p>
 
                 <Card className="p-6 sm:p-8 flex flex-col gap-6 text-sm text-slate-600 leading-relaxed">
                     <p className="rounded-lg bg-amber-50 border border-amber-100 p-3 text-xs text-amber-700">

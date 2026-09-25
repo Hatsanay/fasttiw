@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { cookies } from "next/headers";
 
 const COOKIE_NAME = process.env.SESSION_COOKIE_NAME ?? "fasttiw_store_session";
@@ -72,18 +73,20 @@ export type MyProfile = {
 };
 
 // โปรไฟล์แบบย่อ ใช้แสดงชื่อ+รูปใน Navbar — คืน null ถ้ายังไม่ login หรือเรียก backend ไม่สำเร็จ
-export async function getMyProfile(): Promise<MyProfile | null> {
+// ครอบ React cache — ในหน้าเดียว Navbar กับจุดอื่นอาจเรียกซ้ำ ให้ยิง backend แค่ครั้งเดียวต่อ request
+export const getMyProfile = cache(async function getMyProfile(): Promise<MyProfile | null> {
     const session = await getSession();
     if (!session) return null;
 
     const res = await authorizedFetch("/store/me");
     if (!res.ok) return null;
     return res.json();
-}
+});
 
 // ชุด prod_id ที่ลูกค้าถือสิทธิ์ใช้งานอยู่จริงตอนนี้ (active เท่านั้น ไม่รวมหมดอายุ/ถูกยกเลิก) —
 // ใช้โชว์ badge "ซื้อแล้ว" ในหน้าแคตตาล็อก/รายละเอียดสินค้า คืนเซ็ตว่างถ้ายังไม่ login
-export async function getOwnedProductIds(): Promise<Set<string>> {
+// ครอบ React cache ด้วยเหตุผลเดียวกัน — หน้าสินค้ามี OwnedSwitch หลายจุด
+export const getOwnedProductIds = cache(async function getOwnedProductIds(): Promise<Set<string>> {
     const session = await getSession();
     if (!session) return new Set();
 
@@ -91,4 +94,4 @@ export async function getOwnedProductIds(): Promise<Set<string>> {
     if (!res.ok) return new Set();
     const { data } = (await res.json()) as { data: { ent_product_id: string; effective_status: string }[] };
     return new Set(data.filter((e) => e.effective_status === "active").map((e) => e.ent_product_id));
-}
+});

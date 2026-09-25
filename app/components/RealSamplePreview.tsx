@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Check, X, BookOpenCheck } from "lucide-react";
 import type { SampleQuestion } from "@/lib/api";
+import { MathText } from "@/lib/math";
 
 // ใช้โชว์เฉลยจริง 1 ข้อจากชุดข้อสอบนั้นๆ ที่หน้า product detail (ใกล้ปุ่มซื้อ) แทนคำบรรยายเฉยๆ
 // เลือกโชว์ตัวเลือกที่ถูก + ตัวเลือกผิด 1 ตัวที่มี wrong_reason พร้อมเฉลยเลย ไม่ต้องรอผู้ใช้กดตอบ
@@ -25,27 +26,27 @@ export default function RealSamplePreview({ question, productId }: { question: S
             </div>
 
             <div className="p-5 sm:p-6">
-                <p className="font-medium text-slate-800 mb-4 leading-relaxed whitespace-pre-line">{question.ques_text}</p>
+                <p className="font-medium text-slate-800 mb-4 leading-relaxed whitespace-pre-line"><MathText text={question.ques_text} /></p>
 
                 <div className="flex flex-col gap-2 mb-4">
                     {correctChoice && (
                         <div className="flex items-center justify-between rounded-lg border-2 border-green-300 bg-green-50 px-3 py-2 text-sm">
-                            <span className="text-slate-700">{correctChoice.cho_text}</span>
+                            <span className="text-slate-700"><MathText text={correctChoice.cho_text} /></span>
                             <Check size={16} className="text-green-600 shrink-0" />
                         </div>
                     )}
                     {wrongChoice && (
                         <div>
                             <div className="flex items-center justify-between rounded-lg border-2 border-red-200 bg-red-50 px-3 py-2 text-sm">
-                                <span className="text-slate-700">{wrongChoice.cho_text}</span>
+                                <span className="text-slate-700"><MathText text={wrongChoice.cho_text} /></span>
                                 <X size={16} className="text-red-500 shrink-0" />
                             </div>
-                            <p className="text-xs text-red-500 mt-1.5 px-1">{wrongReason?.wrong_reason}</p>
+                            <p className="text-xs text-red-500 mt-1.5 px-1"><MathText text={wrongReason?.wrong_reason} /></p>
                         </div>
                     )}
                     {otherChoices.map((c) => (
                         <div key={c.cho_id} className="rounded-lg border border-slate-100 px-3 py-2 text-sm text-slate-400">
-                            {c.cho_text}
+                            <MathText text={c.cho_text} />
                         </div>
                     ))}
                 </div>
@@ -53,7 +54,7 @@ export default function RealSamplePreview({ question, productId }: { question: S
                 <div className="rounded-lg bg-brand-50/70 border border-brand-100 p-3.5">
                     <p className="text-xs font-medium text-brand-700 mb-1">วิธีคิด</p>
                     <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-line">
-                        {question.reveal.explanation ?? "ไม่มีคำอธิบายเพิ่มเติม"}
+                        {question.reveal.explanation ? <MathText text={question.reveal.explanation} /> : "ไม่มีคำอธิบายเพิ่มเติม"}
                     </p>
                 </div>
             </div>

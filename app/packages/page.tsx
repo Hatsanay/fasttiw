@@ -4,8 +4,8 @@ import Navbar from "@/app/components/Navbar";
 import Footer from "@/app/components/Footer";
 import Card from "@/components/ui/Card";
 import ShareButton from "@/app/components/ShareButton";
-import { getPublicPackages, productCoverUrl, formatBaht } from "@/lib/api";
-import { getSession } from "@/lib/session";
+import { productCoverUrl, formatBaht } from "@/lib/api";
+import { getPublicPackages } from "@/lib/publicData";
 import BuyPackageButton from "./BuyPackageButton";
 
 export const metadata = {
@@ -15,7 +15,7 @@ export const metadata = {
 };
 
 export default async function PackagesPage() {
-    const [packages, session] = await Promise.all([getPublicPackages(), getSession()]);
+    const packages = await getPublicPackages();
 
     return (
         <div className="flex flex-col min-h-screen">
@@ -34,14 +34,22 @@ export default async function PackagesPage() {
                         {/* คอลัมน์ถี่ขึ้นหลังเปลี่ยนปกเป็นสัดส่วน A4 แนวตั้ง — เดิม 2 คอลัมน์ทำให้การ์ดกว้างราว 620px
                             รูปจึงสูงเกิน 870px บังเนื้อหาข้างล่าง (ชื่อ/ราคา/รายการชุดที่รวมอยู่) จนต้องเลื่อนจอเยอะ
                             คงไว้ 1 คอลัมน์บนมือถือเพราะการ์ดนี้มีรายการชุดข้อสอบพร้อมรูปย่ออยู่ข้างใน ถ้าบีบแคบกว่านี้ชื่อชุดจะโดนตัดทิ้งเกือบหมด */}
-                        {packages.map((pkg) => {
+                        {packages.map((pkg, pkgIndex) => {
                             const pkgCover = productCoverUrl(pkg.pkg_cover_url);
                             return (
                                 <Card key={pkg.pkg_id} id={pkg.pkg_id} className="overflow-hidden flex flex-col">
                                     {/* สัดส่วน A4 แนวตั้ง (210:297) เหมือนปกชุดข้อสอบทุกจุดในเว็บ (เดิมเป็น 16:9 แนวนอน) */}
                                     <div className="relative aspect-[210/297] bg-slate-50">
                                         {pkgCover ? (
-                                            <Image src={pkgCover} alt={pkg.pkg_name} fill className="object-cover" sizes="(max-width: 640px) 100vw, (max-width: 1024px) 33vw, 25vw" />
+                                            <Image
+                                                src={pkgCover}
+                                                alt={pkg.pkg_name}
+                                                fill
+                                                className="object-cover"
+                                                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 33vw, 25vw"
+                                                // ปกแพ็กเกจใบแรกคือสิ่งที่ใหญ่ที่สุดบนจอแรก — โหลดทันที (ดู eager ใน ProductCard)
+                                                {...(pkgIndex === 0 ? { loading: "eager", fetchPriority: "high" } : {})}
+                                            />
                                         ) : (
                                             <div className="flex h-full items-center justify-center text-slate-300">
                                                 <Layers size={32} />
@@ -84,7 +92,7 @@ export default async function PackagesPage() {
                                                     </span>
                                                 )}
                                             </div>
-                                            <BuyPackageButton packageId={pkg.pkg_id} isLoggedIn={!!session} />
+                                            <BuyPackageButton packageId={pkg.pkg_id} />
                                         </div>
                                     </div>
                                 </Card>

@@ -1,7 +1,7 @@
 import { Megaphone } from "lucide-react";
 import Navbar from "@/app/components/Navbar";
 import Footer from "@/app/components/Footer";
-import { getPublicNewsFeed } from "@/lib/api";
+import { getPublicNewsFeed } from "@/lib/publicData";
 import NewsFeedCard from "./NewsFeedCard";
 
 export const metadata = {

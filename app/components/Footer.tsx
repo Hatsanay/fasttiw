@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { QrCode, Mail } from "lucide-react";
+import CurrentYear from "@/app/components/CurrentYear";
 
 const LEARN_LINKS = [
     { href: "/products", label: "แนวข้อสอบทั้งหมด" },
@@ -104,7 +105,7 @@ export default function Footer() {
                 </div>
 
                 <div className="mt-10 pt-6 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-400 text-center sm:text-left">
-                    <p>© {new Date().getFullYear()} Fasttiw by Softwork Development — แนวข้อสอบพร้อมเฉลยละเอียด</p>
+                    <p>© <CurrentYear /> Fasttiw by Softwork Development — แนวข้อสอบพร้อมเฉลยละเอียด</p>
                     <p>แนวข้อสอบทั้งหมดจัดทำขึ้นใหม่</p>
                 </div>
             </div>

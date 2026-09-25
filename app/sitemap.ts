@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { getPublicProducts } from "@/lib/api";
+import { getPublicProducts } from "@/lib/publicData";
 import { SITE_URL } from "@/lib/site";
 
 // ดึงรายการ product จริงจาก backend มาสร้าง sitemap — ไม่ hardcode รายการหน้าเอง เพราะจำนวนชุดข้อสอบ

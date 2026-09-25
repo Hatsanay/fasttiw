@@ -2,8 +2,14 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Navbar from "@/app/components/Navbar";
 import Footer from "@/app/components/Footer";
-import { getPublicProduct, getSampleQuestions } from "@/lib/api";
+import { getPublicProduct, getSampleQuestions, getPublicProducts } from "@/lib/publicData";
 import SampleExam from "./SampleExam";
+
+// สร้างหน้าตัวอย่างของทุกชุดไว้ล่วงหน้าตอน build (เหตุผลเดียวกับหน้ารายละเอียดชุด ../page.tsx)
+export async function generateStaticParams() {
+    const { data } = await getPublicProducts({ limit: 100 });
+    return data.length > 0 ? data.map((p) => ({ id: p.prod_id })) : [{ id: "_" }];
+}
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
     const { id } = await params;

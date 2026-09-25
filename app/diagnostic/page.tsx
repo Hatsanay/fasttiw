@@ -4,7 +4,7 @@ import { ArrowRight, BarChart3, BookOpenCheck, Target, Timer } from "lucide-reac
 import Navbar from "@/app/components/Navbar";
 import Footer from "@/app/components/Footer";
 import Card from "@/components/ui/Card";
-import { getDiagnosticCategories } from "@/lib/diagnostic";
+import { getDiagnosticCategories } from "@/lib/publicData";
 
 const title = "แบบทดสอบวัดระดับฟรี — รู้ใน 10 นาทีว่าอ่อนตรงไหน";
 const description = "ทำแบบทดสอบวัดระดับสั้นๆ คละทุกหัวข้อ ดูผลรายหัวข้อ เฉลยละเอียดทุกข้อ และชุดแนวข้อสอบที่ตรงจุดอ่อนของคุณ ฟรี ไม่ต้องสมัครสมาชิก";

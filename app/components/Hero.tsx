@@ -121,14 +121,36 @@ const VARIANTS = [
     },
 ];
 
+// mockup ฝั่งขวา (2026-09-25) — **เดิมสร้าง mockup ครบ 12 แบบลงหน้าพร้อมกันตั้งแต่โหลด** (ซ่อนด้วย opacity)
+// วัดบนมือถือจำลอง: เบราว์เซอร์ต้องจัดวาง (layout) ทั้ง 12 แบบก่อนวาดอะไรบนจอได้ หัวข้อหลักของหน้าแรกจึงโผล่ช้า
+// ที่สุดในเว็บ · ตอนนี้สร้างแค่ตัวที่แสดงกับตัวถัดไป ที่เหลือทยอยสร้างตามคิวการสลับ (4.5 วินาทีต่อตัว) และไม่ถอดออก
+//
+// ⚠ ความสูงของ grid = mockup ที่สูงที่สุดที่ถูกสร้างแล้ว — **สองตัวแรก (DesktopMockup, MobileMockup) สูงที่สุดเสมอ**
+// ทุกความกว้างจอ (วัดแล้ว 360-1536px: 428-457px ตัวอื่นเตี้ยกว่าทั้งหมด) และถูกสร้างตั้งแต่โหลด หน้าจึงสูงเท่าเดิม
+// ตั้งแต่ต้นและไม่กระตุกตอนสลับ · ถ้าเพิ่ม/เรียง mockup ใหม่ ให้ตัวที่สูงที่สุดอยู่ลำดับ 0-1 เสมอ ไม่งั้นเนื้อหาด้านล่าง
+// จะถูกดันลงตอนสลับมาถึงตัวนั้นครั้งแรก
+
 // ข้อความหัวเรื่อง+รูปสลับคู่กันเสมอ (ไม่ใช่สลับแค่รูปแล้วข้อความตายตัว) เพราะแต่ละคู่สื่อจุดขาย
 // คนละด้าน (เฉลยละเอียด / ใช้งานผ่านมือถือง่าย) — ใช้ CSS grid ซ้อนเลเยอร์ (แทน fixed height ที่เดาไว้ผิด)
 // ให้ความสูง container ปรับตามตัวที่สูงสุดอัตโนมัติ กันข้อความ/รูปทับกันตอนความยาวไม่เท่ากัน
 export default function Hero() {
-    const [index, setIndex] = useState(0);
+    // index = ตัวที่แสดงอยู่ · mounted = mockup ที่ถูกสร้างแล้ว (ดูเหตุผลที่คอมเมนต์ "mockup ฝั่งขวา" ด้านบน)
+    // เก็บเป็น state ก้อนเดียวให้เปลี่ยนพร้อมกันในครั้งเดียว — ถ้าแยกแล้วไปตาม index ใน useEffect จะเรนเดอร์ซ้ำทุกรอบสลับ
+    const [{ index, mounted }, setView] = useState<{ index: number; mounted: ReadonlySet<number> }>(() => ({
+        index: 0,
+        mounted: new Set([0, 1]),
+    }));
+
+    // สลับไปตัวที่ pick เลือก พร้อมเตรียมตัวถัดไปไว้ล่วงหน้าหนึ่งตัวเสมอ — ถึงคิวแล้ว crossfade ได้ทันที ไม่ต้องรอสร้าง
+    const show = (pick: (current: number) => number) =>
+        setView(({ index: current, mounted: prev }) => {
+            const target = pick(current);
+            const next = (target + 1) % VARIANTS.length;
+            return { index: target, mounted: prev.has(target) && prev.has(next) ? prev : new Set([...prev, target, next]) };
+        });
 
     useEffect(() => {
-        const timer = setInterval(() => setIndex((i) => (i + 1) % VARIANTS.length), ROTATE_MS);
+        const timer = setInterval(() => show((i) => (i + 1) % VARIANTS.length), ROTATE_MS);
         return () => clearInterval(timer);
     }, []);
 
@@ -205,7 +227,7 @@ export default function Hero() {
                                     i === index ? "opacity-100" : "opacity-0 pointer-events-none"
                                 )}
                             >
-                                <v.Mockup />
+                                {mounted.has(i) && <v.Mockup />}
                             </div>
                         ))}
                     </div>
@@ -215,7 +237,7 @@ export default function Hero() {
                             <button
                                 key={i}
                                 type="button"
-                                onClick={() => setIndex(i)}
+                                onClick={() => show(() => i)}
                                 aria-label={`มุมมองที่ ${i + 1}`}
                                 className={cn("h-1.5 rounded-full transition-all", i === index ? "w-6 bg-brand-500" : "w-1.5 bg-slate-200")}
                             />

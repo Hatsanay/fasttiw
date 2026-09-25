@@ -10,10 +10,15 @@ export default function ProductCard({
     product,
     owned = false,
     hideCategoryBadge = false,
+    eager = false,
 }: {
     product: Product;
     owned?: boolean;
     hideCategoryBadge?: boolean;
+    // การ์ดแถวแรกที่เห็นทันทีตอนเปิดหน้า — โหลดปกทันทีแทนการรอให้จัดวางหน้าเสร็จก่อน (ค่าเริ่มต้นของ next/image
+    // คือ lazy) ปกแถวแรกคือสิ่งที่ใหญ่ที่สุดบนจอ (LCP) ของหน้ารวมชุด วัดแล้วเริ่มโหลดช้ากว่าที่ควร ~0.6 วินาที
+    // ใช้เฉพาะแถวแรกเท่านั้น ถ้าใส่ทุกใบจะแย่งเน็ตกันเองจนช้าลงทั้งหมด
+    eager?: boolean;
 }) {
     const cover = productCoverUrl(product.prod_cover_url);
     const comparePrice = compareAtPrice(product);
@@ -25,7 +30,14 @@ export default function ProductCard({
                     แนวนอน ทำให้ object-cover ครอปหัว/ท้ายปกทิ้ง (การ์ดนี้ใช้ร่วมกันทั้ง landing page และ /products) */}
                 <div className="relative aspect-[210/297] bg-slate-50">
                     {cover ? (
-                        <Image src={cover} alt={product.prod_name} fill className="object-cover" sizes="(max-width: 640px) 50vw, 16vw" />
+                        <Image
+                            src={cover}
+                            alt={product.prod_name}
+                            fill
+                            className="object-cover"
+                            sizes="(max-width: 640px) 50vw, 16vw"
+                            {...(eager ? { loading: "eager", fetchPriority: "high" } : {})}
+                        />
                     ) : (
                         <div className="flex h-full items-center justify-center text-slate-300">
                             <FileQuestion size={28} />

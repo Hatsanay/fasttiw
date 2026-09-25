@@ -6,17 +6,17 @@ import { toast } from "sonner";
 import Button from "@/components/ui/Button";
 import { checkoutPackageAction } from "@/app/actions/checkout";
 
-export default function BuyPackageButton({ packageId, isLoggedIn }: { packageId: string; isLoggedIn: boolean }) {
+export default function BuyPackageButton({ packageId }: { packageId: string }) {
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
 
     function handleBuy() {
-        if (!isLoggedIn) {
-            router.push("/login?next=/packages");
-            return;
-        }
         startTransition(async () => {
             const result = await checkoutPackageAction(packageId);
+            if ("needLogin" in result) {
+                router.push("/login?next=/packages");
+                return;
+            }
             if ("error" in result) {
                 toast.error(result.error);
                 return;

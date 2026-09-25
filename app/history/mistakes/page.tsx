@@ -11,6 +11,7 @@ import QuestionImage from "@/app/components/QuestionImage";
 import ChoiceImage from "@/app/components/ChoiceImage";
 import { authorizedFetch } from "@/lib/session";
 import { cn } from "@/lib/cn";
+import { MathText } from "@/lib/math";
 
 export const metadata = { title: "ข้อที่ต้องทบทวน" };
 
@@ -162,7 +163,7 @@ export default async function MistakesPage({
                                 </div>
 
                                 <QuestionImage src={m.ques_image_url} />
-                                <h2 className="mb-4 font-medium leading-relaxed text-slate-900 whitespace-pre-line">{m.ques_text}</h2>
+                                <h2 className="mb-4 font-medium leading-relaxed text-slate-900 whitespace-pre-line"><MathText text={m.ques_text} /></h2>
 
                                 <div className="mb-4 flex flex-col gap-2">
                                     {m.choices.map((c) => {
@@ -183,14 +184,14 @@ export default async function MistakesPage({
                                                 >
                                                     <span className="flex-1">
                                                         <ChoiceImage src={c.cho_image_url} />
-                                                        {c.cho_text}
+                                                        <MathText text={c.cho_text} />
                                                         {pickedWrong && <span className="ml-2 text-xs text-red-500">(ที่คุณเลือก)</span>}
                                                     </span>
                                                     {c.is_correct && <Check size={15} className="shrink-0 text-green-600" />}
                                                     {pickedWrong && <X size={15} className="shrink-0 text-red-500" />}
                                                 </div>
                                                 {!c.is_correct && c.wrong_reason && (
-                                                    <p className="mt-1 px-1 text-xs text-slate-400">{c.wrong_reason}</p>
+                                                    <p className="mt-1 px-1 text-xs text-slate-400"><MathText text={c.wrong_reason} /></p>
                                                 )}
                                             </div>
                                         );
@@ -200,7 +201,7 @@ export default async function MistakesPage({
                                 {m.ques_explanation && (
                                     <div className="mb-3 rounded-lg border border-brand-100 bg-brand-50/60 p-3.5">
                                         <p className="mb-1 text-xs font-medium text-brand-700">วิธีคิด</p>
-                                        <p className="text-sm leading-relaxed text-slate-600 whitespace-pre-line">{m.ques_explanation}</p>
+                                        <p className="text-sm leading-relaxed text-slate-600 whitespace-pre-line"><MathText text={m.ques_explanation} /></p>
                                     </div>
                                 )}
 

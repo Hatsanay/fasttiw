@@ -10,6 +10,7 @@ import ReportQuestionButton from "@/app/components/ReportQuestionButton";
 import QuestionImage from "@/app/components/QuestionImage";
 import ChoiceImage from "@/app/components/ChoiceImage";
 import { cn } from "@/lib/cn";
+import { MathText } from "@/lib/mathClient";
 
 type ChoiceReason = { cho_id: string; cho_text: string; cho_image_url: string | null; is_correct: boolean; wrong_reason: string | null };
 export type BookmarkedQuestion = {
@@ -51,7 +52,7 @@ export default function BookmarksList({ initialBookmarks }: { initialBookmarks: 
                 <Card key={b.bmk_id} className="p-5">
                     <p className="text-xs text-brand-600 font-medium mb-2">{b.prod_name}</p>
                     <QuestionImage src={b.ques_image_url} />
-                    <h2 className="font-medium text-slate-900 leading-relaxed whitespace-pre-line mb-4">{b.ques_text}</h2>
+                    <h2 className="font-medium text-slate-900 leading-relaxed whitespace-pre-line mb-4"><MathText text={b.ques_text} /></h2>
 
                     <div className="flex flex-col gap-2 mb-4">
                         {b.choices.map((c) => (
@@ -64,13 +65,13 @@ export default function BookmarksList({ initialBookmarks }: { initialBookmarks: 
                                 >
                                     <span className="flex-1">
                                         <ChoiceImage src={c.cho_image_url} />
-                                        {c.cho_text}
+                                        <MathText text={c.cho_text} />
                                     </span>
                                     {c.is_correct && <Check size={15} className="text-green-600 shrink-0" />}
                                     {!c.is_correct && c.wrong_reason && <X size={15} className="text-slate-300 shrink-0" />}
                                 </div>
                                 {!c.is_correct && c.wrong_reason && (
-                                    <p className="text-xs text-slate-400 mt-1 px-1">{c.wrong_reason}</p>
+                                    <p className="text-xs text-slate-400 mt-1 px-1"><MathText text={c.wrong_reason} /></p>
                                 )}
                             </div>
                         ))}
@@ -79,7 +80,7 @@ export default function BookmarksList({ initialBookmarks }: { initialBookmarks: 
                     {b.ques_explanation && (
                         <div className="p-3.5 rounded-lg bg-brand-50/60 border border-brand-100 mb-3">
                             <p className="text-xs font-medium text-brand-700 mb-1">วิธีคิด</p>
-                            <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-line">{b.ques_explanation}</p>
+                            <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-line"><MathText text={b.ques_explanation} /></p>
                         </div>
                     )}
 

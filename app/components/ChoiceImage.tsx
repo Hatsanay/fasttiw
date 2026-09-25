@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
+import { preload } from "react-dom";
+import Image, { getImageProps } from "next/image";
 import { Maximize2 } from "lucide-react";
 import { productCoverUrl } from "@/lib/api";
 import ImageLightbox from "@/app/components/ImageLightbox";
@@ -15,6 +16,18 @@ import ImageLightbox from "@/app/components/ImageLightbox";
 //
 // เจตนาออกแบบ: กดที่ "ตัวรูป" = เลือกคำตอบตามปกติ (คนส่วนใหญ่คาดหวังแบบนั้นเพราะรูปคือตัวเลือก)
 // กดที่ "ปุ่มขยายมุมขวาล่าง" = ดูรูปเต็มจอ — แยกกันชัดเจน ไม่ต้องเดาว่าแตะแล้วจะเกิดอะไร
+const SIZES = "160px";
+
+// โหลดรูปของข้อถัดไปไว้ล่วงหน้าระหว่างที่ผู้ใช้ยังอ่านข้อปัจจุบันอยู่ (2026-09-25) — ExamRunner เรียกตอนเปลี่ยนข้อ
+// ใช้ getImageProps ด้วย sizes ชุดเดียวกับ <Image> ข้างล่าง (รูปตัวเลือก)เป๊ะ จึงได้ URL ของ /_next/image ตัวเดียวกับที่จะแสดง
+// = โหลดจาก cache ทันทีตอนกดข้อถัดไป · ⚠ แก้ sizes ที่ไหนต้องแก้ผ่านค่าคงที่นี้ ไม่งั้นโหลดล่วงหน้าผิดไฟล์เงียบๆ
+export function preloadChoiceImage(src: string | null) {
+    const url = productCoverUrl(src);
+    if (!url) return;
+    const { props } = getImageProps({ src: url, alt: "", fill: true, sizes: SIZES });
+    preload(props.src, { as: "image", imageSrcSet: props.srcSet, imageSizes: props.sizes, fetchPriority: "low" });
+}
+
 export default function ChoiceImage({ src }: { src: string | null }) {
     const [zoomed, setZoomed] = useState(false);
     const url = productCoverUrl(src);
@@ -29,7 +42,7 @@ export default function ChoiceImage({ src }: { src: string | null }) {
     return (
         <>
             <span className="relative mb-2 block h-20 w-full max-w-40 overflow-hidden rounded-lg border border-slate-100 bg-slate-50">
-                <Image src={url} alt="" fill className="object-contain" sizes="160px" />
+                <Image src={url} alt="" fill className="object-contain" sizes={SIZES} />
                 <span
                     role="button"
                     tabIndex={0}

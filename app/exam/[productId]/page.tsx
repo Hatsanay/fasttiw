@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Navbar from "@/app/components/Navbar";
 import Footer from "@/app/components/Footer";
-import { getPublicProduct } from "@/lib/api";
+import { getPublicProduct } from "@/lib/publicData";
 import ModeSelectClient from "./ModeSelectClient";
 
 export const metadata = { title: "เลือกโหมดทำข้อสอบ" };

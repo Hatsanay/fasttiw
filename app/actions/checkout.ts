@@ -1,8 +1,10 @@
 "use server";
 
-import { authorizedFetch } from "@/lib/session";
+import { authorizedFetch, getSession } from "@/lib/session";
 
 export type CheckoutResult = { ord_id: string } | { error: string };
+// ผลของการซื้อแพ็กเกจ — เพิ่ม needLogin ให้ปุ่มพาไปหน้า login เอง (หน้า /packages จึงไม่ต้องอ่าน cookie)
+export type PackageCheckoutResult = CheckoutResult | { needLogin: true };
 
 // สร้าง order (pending) แล้วจบแค่นั้น — **ห้าม**เรียกยืนยันจ่ายเงินต่อจากตรงนี้เด็ดขาด (ผิดกฎเหล็กข้อ 1
 // ใน CLAUDE.md: "ให้สิทธิ์เฉพาะตอนรับ webhook เท่านั้น") checkout() ฝั่ง backend สร้าง PromptPay payment intent +
@@ -29,7 +31,11 @@ export async function checkoutAction(productIds: string[], couponCode?: string):
 
 // ซื้อแพ็กเกจตรงๆ ไม่ผ่านตะกร้า (ตะกร้าฝั่ง client เก็บแค่ product เดี่ยว ผสมกับแพ็กเกจจะซับซ้อนเกินจำเป็น) —
 // v1: ซื้อแพ็กเกจใช้คูปองพร้อมกันไม่ได้ (ดู checkout() ฝั่ง backend) — ไม่ mock-confirm อัตโนมัติเหมือนกัน
-export async function checkoutPackageAction(packageId: string): Promise<CheckoutResult> {
+export async function checkoutPackageAction(packageId: string): Promise<PackageCheckoutResult> {
+    // เดิมหน้า /packages อ่าน session เองเพื่อส่ง isLoggedIn ให้ปุ่ม ซึ่งทำให้ทั้งหน้าต้องเรนเดอร์ใหม่ทุกครั้งที่มีคนเข้า
+    // ย้ายมาเช็คตอนกดซื้อแทน (2026-09-24) — ตรงจุดกว่าด้วย เพราะ session อาจหมดอายุระหว่างเปิดหน้าทิ้งไว้
+    if (!(await getSession())) return { needLogin: true };
+
     const checkoutRes = await authorizedFetch("/store/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

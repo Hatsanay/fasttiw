@@ -11,6 +11,7 @@ import QuestionImage from "@/app/components/QuestionImage";
 import ChoiceImage from "@/app/components/ChoiceImage";
 import { productCoverUrl, formatBaht, compareAtPrice, effectivePrice } from "@/lib/api";
 import type { DiagnosticResult, GradedQuestion } from "@/lib/diagnosticTypes";
+import { MathText } from "@/lib/mathClient";
 
 // ระดับของคะแนน — เส้น 60% เป็นเกณฑ์ "ควรเร่ง" ของเราเอง (backend ส่งมาใน summary.weak_below_pct)
 // ไม่อ้างว่าเป็นเกณฑ์ทางการของสนามสอบใด · สีเป็นสัญญาณสถานะ มีคำกำกับเสมอ ไม่ให้ต้องเดาจากสีอย่างเดียว
@@ -68,7 +69,7 @@ function AnswerReview({ question, number }: { question: GradedQuestion; number: 
                 </span>
             </div>
             <QuestionImage src={question.ques_image_url} />
-            <p className="text-slate-900 font-medium leading-relaxed whitespace-pre-line mb-4">{question.ques_text}</p>
+            <p className="text-slate-900 font-medium leading-relaxed whitespace-pre-line mb-4"><MathText text={question.ques_text} /></p>
             <div className="flex flex-col gap-2">
                 {question.choices.map((choice) => {
                     const reason = question.reveal.choice_reasons.find((r) => r.cho_id === choice.cho_id);
@@ -84,14 +85,14 @@ function AnswerReview({ question, number }: { question: GradedQuestion; number: 
                             >
                                 <span className="flex-1">
                                     <ChoiceImage src={choice.cho_image_url} />
-                                    {choice.cho_text}
+                                    <MathText text={choice.cho_text} />
                                     {isPicked && <span className="ml-1.5 text-xs text-slate-500">(ที่คุณเลือก)</span>}
                                 </span>
                                 {isCorrect && <Check size={16} className="text-green-600 shrink-0 mt-0.5" />}
                                 {isPicked && !isCorrect && <X size={16} className="text-red-500 shrink-0 mt-0.5" />}
                             </div>
                             {!isCorrect && reason?.wrong_reason && (isPicked || !question.is_correct) && (
-                                <p className={cn("text-xs mt-1 px-1", isPicked ? "text-red-500" : "text-slate-400")}>{reason.wrong_reason}</p>
+                                <p className={cn("text-xs mt-1 px-1", isPicked ? "text-red-500" : "text-slate-400")}><MathText text={reason.wrong_reason} /></p>
                             )}
                         </div>
                     );
@@ -99,7 +100,7 @@ function AnswerReview({ question, number }: { question: GradedQuestion; number: 
             </div>
             <div className="mt-4 rounded-xl bg-brand-50/60 border border-brand-100 p-4">
                 <p className="text-sm font-medium text-brand-700 mb-1.5">วิธีคิด</p>
-                <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-line">{question.reveal.explanation ?? "ไม่มีคำอธิบายเพิ่มเติม"}</p>
+                <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-line">{question.reveal.explanation ? <MathText text={question.reveal.explanation} /> : "ไม่มีคำอธิบายเพิ่มเติม"}</p>
             </div>
         </Card>
     );

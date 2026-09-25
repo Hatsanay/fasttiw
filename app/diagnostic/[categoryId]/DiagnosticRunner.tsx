@@ -10,6 +10,7 @@ import QuestionImage from "@/app/components/QuestionImage";
 import ChoiceImage from "@/app/components/ChoiceImage";
 import type { DiagnosticQuestion, DiagnosticResult } from "@/lib/diagnosticTypes";
 import DiagnosticResultView from "./DiagnosticResultView";
+import { MathText } from "@/lib/mathClient";
 
 // เก็บผลไว้ในแท็บนี้ — ลูกค้ากดดูชุดที่แนะนำแล้วกดย้อนกลับ ต้องเห็นผลเดิม ไม่ใช่แบบทดสอบชุดใหม่
 // (sessionStorage หายเองเมื่อปิดแท็บ ไม่เก็บอะไรข้ามวัน และไม่ส่งไปที่ไหน)
@@ -158,7 +159,7 @@ export default function DiagnosticRunner({
 
             <Card className="p-6">
                 <QuestionImage src={question.ques_image_url} />
-                <h1 className="text-lg font-medium text-slate-900 mb-6 leading-relaxed whitespace-pre-line">{question.ques_text}</h1>
+                <h1 className="text-lg font-medium text-slate-900 mb-6 leading-relaxed whitespace-pre-line"><MathText text={question.ques_text} /></h1>
                 <div className="flex flex-col gap-3">
                     {question.choices.map((choice) => {
                         const isSelected = selectedId === choice.cho_id;
@@ -174,7 +175,7 @@ export default function DiagnosticRunner({
                                 )}
                             >
                                 <ChoiceImage src={choice.cho_image_url} />
-                                {choice.cho_text}
+                                <MathText text={choice.cho_text} />
                             </button>
                         );
                     })}

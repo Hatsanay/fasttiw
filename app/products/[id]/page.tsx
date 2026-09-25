@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -10,8 +11,9 @@ import Button from "@/components/ui/Button";
 import AddToCartButton from "@/app/components/AddToCartButton";
 import RealSamplePreview from "@/app/components/RealSamplePreview";
 import ShareButton from "@/app/components/ShareButton";
-import { getPublicProduct, getSampleQuestions, productCoverUrl, formatBaht, compareAtPrice } from "@/lib/api";
-import { getOwnedProductIds } from "@/lib/session";
+import OwnedSwitch from "@/app/components/OwnedSwitch";
+import { productCoverUrl, formatBaht, compareAtPrice } from "@/lib/api";
+import { getPublicProduct, getSampleQuestions, getPublicProducts } from "@/lib/publicData";
 import { SITE_URL } from "@/lib/site";
 
 // อธิบายสั้นสำหรับ meta description/OG — ตัดจาก prod_description จริงถ้ามี ไม่งั้น fallback เป็นประโยค
@@ -22,6 +24,14 @@ function buildDescription(name: string, description: string | null, questionCoun
         return flat.length > 160 ? `${flat.slice(0, 157)}...` : flat;
     }
     return `ทำแนวข้อสอบ ${name} ออนไลน์ ${questionCount.toLocaleString("th-TH")} ข้อ พร้อมเฉลยละเอียดทีละขั้นตอน`;
+}
+
+// สร้างหน้าสำเร็จรูปของทุกชุดที่เผยแพร่อยู่ตอน build (ชุดที่เพิ่งเผยแพร่หลัง build ยังเปิดได้ปกติ —
+// Next สร้างให้ตอนมีคนเข้าครั้งแรกแล้วเก็บไว้ใช้ต่อ) · ต้องคืนอย่างน้อย 1 รายการเสมอ ไม่งั้น build ล้ม
+// (กติกาของ Cache Components) ถ้ายังไม่มีชุดเผยแพร่เลยใช้ id หลอกที่ได้หน้า 404 แทน
+export async function generateStaticParams() {
+    const { data } = await getPublicProducts({ limit: 100 });
+    return data.length > 0 ? data.map((p) => ({ id: p.prod_id })) : [{ id: "_" }];
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -54,20 +64,42 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 export default async function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
-    const [product, ownedProductIds, sampleQuestions] = await Promise.all([
-        getPublicProduct(id),
-        getOwnedProductIds(),
-        getSampleQuestions(id),
-    ]);
+    const [product, sampleQuestions] = await Promise.all([getPublicProduct(id), getSampleQuestions(id)]);
     if (!product) notFound();
 
-    const owned = ownedProductIds.has(id);
     const cover = productCoverUrl(product.prod_cover_url);
     const comparePrice = compareAtPrice(product);
     // เลือกข้อที่มีตัวเลือกผิดพร้อม wrong_reason ให้โชว์ครบทั้ง 2 จุดขาย (วิธีคิด + เหตุผลตัวเลือกผิด)
     const demoQuestion = sampleQuestions.questions.find((q) =>
         q.reveal.choice_reasons.some((r) => !r.is_correct && r.wrong_reason)
     );
+
+    // ชิ้นที่แสดงเฉพาะคนที่ยังไม่ซื้อ — ใช้ตัวเดียวกันทั้งตอนรอ (fallback) และตอนรู้ผลแล้ว จะได้ไม่กระพริบ
+    const addToCart = (
+        <AddToCartButton
+            product={{
+                prod_id: product.prod_id,
+                prod_name: product.prod_name,
+                prod_price: product.prod_price,
+                prod_is_free: product.prod_is_free,
+                prod_cover_url: product.prod_cover_url,
+            }}
+        />
+    );
+    const sampleLink = (
+        <Link
+            href={`/products/${product.prod_id}/sample`}
+            className="mt-3 text-center text-sm font-medium text-brand-600 hover:text-brand-700 transition-colors"
+        >
+            ลองทำตัวอย่างฟรี 10 ข้อก่อนตัดสินใจซื้อ
+        </Link>
+    );
+    const demoSection = demoQuestion ? (
+        <div className="mt-12 sm:mt-16 max-w-xl mx-auto sm:mx-0">
+            <p className="text-sm font-medium text-slate-800 mb-3">เฉลยจริงหน้าตาเป็นแบบนี้ ลองดูก่อนตัดสินใจ</p>
+            <RealSamplePreview question={demoQuestion} productId={product.prod_id} />
+        </div>
+    ) : null;
 
     // BreadcrumbList — ทำให้ผลค้นหาแสดงเส้นทาง "หน้าแรก > แนวข้อสอบทั้งหมด > ชื่อชุด" แทน URL ดิบ
     // อ่านง่ายขึ้นและบอกโครงสร้างเว็บให้ Google ด้วย
@@ -117,7 +149,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                         ความสูงจะพุ่งไปเกิน 800px สูงกว่าคอลัมน์ข้อมูลสินค้าข้างๆ มาก */}
                     <div className="relative aspect-[210/297] w-full max-w-sm sm:mx-auto bg-slate-50 rounded-2xl overflow-hidden border border-slate-100">
                         {cover ? (
-                            <Image src={cover} alt={product.prod_name} fill className="object-cover" sizes="(max-width: 640px) 100vw, 384px" priority />
+                            <Image src={cover} alt={product.prod_name} fill className="object-cover" sizes="(max-width: 640px) 100vw, 384px" preload />
                         ) : (
                             <div className="flex h-full items-center justify-center text-slate-300">
                                 <FileQuestion size={56} />
@@ -133,12 +165,17 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                     <div className="flex flex-col">
                         <div className="flex items-center gap-2 mb-3">
                             {product.prod_category_name && <Badge tone="brand" className="w-fit">{product.prod_category_name}</Badge>}
-                            {owned && (
-                                <Badge tone="success" className="w-fit flex items-center gap-1">
-                                    <CheckCircle2 size={13} />
-                                    ซื้อแล้ว
-                                </Badge>
-                            )}
+                            <Suspense fallback={null}>
+                                <OwnedSwitch
+                                    productId={product.prod_id}
+                                    owned={
+                                        <Badge tone="success" className="w-fit flex items-center gap-1">
+                                            <CheckCircle2 size={13} />
+                                            ซื้อแล้ว
+                                        </Badge>
+                                    }
+                                />
+                            </Suspense>
                         </div>
                         <h1 className="text-2xl sm:text-3xl font-semibold text-slate-900 mb-2">{product.prod_name}</h1>
                         <p className="text-sm text-slate-400 mb-6">{product.question_count.toLocaleString("th-TH")} ข้อ พร้อมเฉลยละเอียด</p>
@@ -163,39 +200,29 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                                     <span className="text-2xl font-semibold text-brand-600 whitespace-nowrap">{formatBaht(product.prod_price)}</span>
                                 </span>
                             )}
-                            {owned ? (
-                                <Link href={`/exam/${product.prod_id}`}>
-                                    <Button size="lg">ไปทำข้อสอบ</Button>
-                                </Link>
-                            ) : (
-                                <AddToCartButton
-                                    product={{
-                                        prod_id: product.prod_id,
-                                        prod_name: product.prod_name,
-                                        prod_price: product.prod_price,
-                                        prod_is_free: product.prod_is_free,
-                                        prod_cover_url: product.prod_cover_url,
-                                    }}
+                            <Suspense fallback={addToCart}>
+                                <OwnedSwitch
+                                    productId={product.prod_id}
+                                    owned={
+                                        <Link href={`/exam/${product.prod_id}`}>
+                                            <Button size="lg">ไปทำข้อสอบ</Button>
+                                        </Link>
+                                    }
+                                    notOwned={addToCart}
                                 />
-                            )}
+                            </Suspense>
                         </div>
 
-                        {!owned && (
-                            <Link
-                                href={`/products/${product.prod_id}/sample`}
-                                className="mt-3 text-center text-sm font-medium text-brand-600 hover:text-brand-700 transition-colors"
-                            >
-                                ลองทำตัวอย่างฟรี 10 ข้อก่อนตัดสินใจซื้อ
-                            </Link>
-                        )}
+                        <Suspense fallback={sampleLink}>
+                            <OwnedSwitch productId={product.prod_id} owned={null} notOwned={sampleLink} />
+                        </Suspense>
                     </div>
                 </div>
 
-                {!owned && demoQuestion && (
-                    <div className="mt-12 sm:mt-16 max-w-xl mx-auto sm:mx-0">
-                        <p className="text-sm font-medium text-slate-800 mb-3">เฉลยจริงหน้าตาเป็นแบบนี้ ลองดูก่อนตัดสินใจ</p>
-                        <RealSamplePreview question={demoQuestion} productId={product.prod_id} />
-                    </div>
+                {demoSection && (
+                    <Suspense fallback={demoSection}>
+                        <OwnedSwitch productId={product.prod_id} owned={null} notOwned={demoSection} />
+                    </Suspense>
                 )}
             </main>
             <Footer />
