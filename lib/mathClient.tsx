@@ -2,7 +2,7 @@
 
 import { Fragment, Suspense, use } from "react";
 import type katexType from "katex";
-import { splitMath, hasMath } from "./mathParse";
+import { splitMath, hasMath, katexSource } from "./mathParse";
 import "katex/dist/katex.min.css";
 
 // MathText สำหรับ client component (หน้าทำข้อสอบ ตัวอย่างฟรี แบบทดสอบวัดระดับ ฯลฯ) — 2026-09-24
@@ -28,7 +28,7 @@ function MathSegment({ latex }: { latex: string }) {
     return (
         <span
             // KaTeX คืน HTML ที่ sanitize มาแล้วในโหมด trust: false (ค่าเริ่มต้น) — ดูเหตุผลที่ lib/mathParse.ts
-            dangerouslySetInnerHTML={{ __html: katex.renderToString(latex, { throwOnError: false, output: "html" }) }}
+            dangerouslySetInnerHTML={{ __html: katex.renderToString(katexSource(latex), { throwOnError: false, output: "html" }) }}
         />
     );
 }

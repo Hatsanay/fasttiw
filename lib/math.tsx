@@ -1,7 +1,7 @@
 import "server-only";
 import katex from "katex";
 import { Fragment } from "react";
-import { splitMath } from "./mathParse";
+import { splitMath, katexSource } from "./mathParse";
 import "katex/dist/katex.min.css";
 
 // ตัวเรนเดอร์สูตรบนหน้าเว็บ — ตรรกะการแยกสูตรอยู่ที่ lib/mathParse.ts (ไม่มี JSX จึงเทสต์ได้ตรงๆ)
@@ -28,7 +28,7 @@ export function MathText({ text, className }: { text: string | null | undefined;
                         key={i}
                         // KaTeX คืน HTML ที่ sanitize มาแล้วในโหมด trust: false — ดูเหตุผลด้านบนของไฟล์
                         dangerouslySetInnerHTML={{
-                            __html: katex.renderToString(seg.value, { throwOnError: false, output: "html" }),
+                            __html: katex.renderToString(katexSource(seg.value), { throwOnError: false, output: "html" }),
                         }}
                     />
                 ) : (
