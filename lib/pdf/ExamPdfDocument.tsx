@@ -5,8 +5,8 @@ import { Document, Page, Text, View, Image as PdfImage, StyleSheet, Font } from 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { toPdfThai } from "./thaiText";
-// สูตรคณิตศาสตร์ต้องแปลงเป็นตัวอักษรจริงก่อน react-pdf เรนเดอร์ HTML ของ KaTeX ไม่ได้ (ดู mathText.ts)
-import { mathToPdfText } from "./mathText";
+// ข้อความที่อาจมีสูตรคณิตผ่าน PdfMathText ทุกจุด — react-pdf เรนเดอร์ HTML ของ KaTeX ไม่ได้ (ดู mathText.ts / PdfMathText.tsx)
+import { PdfMathText } from "./PdfMathText";
 import { hasScoring, formatScore } from "../scoring";
 
 // react-pdf ไม่ผ่าน Next.js font loader เลย (คนละ render pipeline) ต้องลงทะเบียนไฟล์ฟอนต์ตรงๆ เอง
@@ -146,7 +146,7 @@ export function ExamPdfDocument({
                     <View key={q.ques_id} style={styles.question} wrap={false}>
                         <View style={styles.questionRow}>
                             <Text style={styles.questionNumber}>{i + 1}.</Text>
-                            <Text style={styles.questionText}>{toPdfThai(mathToPdfText(q.ques_text))}</Text>
+                            <PdfMathText style={styles.questionText} text={q.ques_text} />
                             {scored && (
                                 <Text style={styles.questionScore}>{toPdfThai(`(${formatScore(q.ques_score)} คะแนน)`)}</Text>
                             )}
@@ -161,12 +161,13 @@ export function ExamPdfDocument({
                                         {THAI_CHOICE_LETTERS[ci] ?? ci + 1}.
                                     </Text>
                                     <View style={styles.choiceBody}>
-                                        <Text style={[styles.choiceText, isCorrect ? styles.choiceTextCorrect : undefined]}>
-                                            {toPdfThai(`${mathToPdfText(c.cho_text)}${isCorrect ? "  ✓ คำตอบที่ถูกต้อง" : ""}`)}
-                                        </Text>
+                                        <PdfMathText
+                                            style={[styles.choiceText, isCorrect ? styles.choiceTextCorrect : undefined]}
+                                            text={`${c.cho_text}${isCorrect ? "  ✓ คำตอบที่ถูกต้อง" : ""}`}
+                                        />
                                         {c.cho_image && <PdfImage src={c.cho_image} style={styles.choiceImage} />}
                                         {reason && !reason.is_correct && reason.wrong_reason && (
-                                            <Text style={styles.wrongReason}>{toPdfThai(`✗ ${mathToPdfText(reason.wrong_reason)}`)}</Text>
+                                            <PdfMathText style={styles.wrongReason} text={`✗ ${reason.wrong_reason}`} />
                                         )}
                                     </View>
                                 </View>
@@ -175,7 +176,7 @@ export function ExamPdfDocument({
                         {q.reveal?.explanation && (
                             <View style={styles.explanationBox}>
                                 <Text style={styles.explanationLabel}>วิธีคิด</Text>
-                                <Text style={styles.explanationText}>{toPdfThai(mathToPdfText(q.reveal.explanation))}</Text>
+                                <PdfMathText style={styles.explanationText} text={q.reveal.explanation} />
                             </View>
                         )}
                     </View>

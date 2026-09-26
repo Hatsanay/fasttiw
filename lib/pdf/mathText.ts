@@ -8,8 +8,12 @@
 // เลขยกกำลังใช้ตัวยก ², รากใช้ √ ฯลฯ · ไฟล์ PDF คือใบงานไว้พิมพ์ลงกระดาษ อ่านออกคือพอแล้ว
 // และดีกว่าปล่อยให้ลูกค้าเห็น `$\frac{3}{2}$` ดิบๆ ซึ่งคือสิ่งที่จะเกิดถ้าไม่ทำอะไรเลย
 //
-// ⚠ ข้อจำกัดที่ยอมรับ: สูตรซับซ้อน (เมทริกซ์ อินทิกรัล เศษส่วนซ้อน) จะได้รูปแบบที่อ่านได้แต่ไม่สวย
+// ⚠ ข้อจำกัดที่ยอมรับ: สูตรซับซ้อน (เมทริกซ์ อินทิกรัล) จะได้รูปแบบที่อ่านได้แต่ไม่สวย
 // ถ้าวันหนึ่งเนื้อหามีสูตรแบบนั้นเยอะ ค่อยลงทุนทำเป็นรูปจริง
+//
+// **อัปเดต 2026-09-26: เศษส่วนซ้อนชั้นจริงแล้ว** — ข้อความที่มีเศษส่วนไม่ใช้ mathToPdfText ทั้งก้อน แต่ผ่าน
+// parsePdfMathLine ด้านล่าง แล้ว PdfMathText.tsx วาดเป็นกล่องตัวเศษ/เส้น/ตัวส่วน · mathToPdfText ยังใช้กับ
+// ข้อความที่ไม่มีเศษส่วน (หน้าตาเดิมทุกประการ) และส่วนอื่นของสูตร (x², √)
 
 const SUPERSCRIPT: Record<string, string> = {
     "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹",
@@ -76,6 +80,81 @@ function latexToPlain(latex: string): string {
 
     // ปีกกาที่เหลือจากคำสั่งที่ไม่รู้จัก เอาออกให้อ่านง่าย แล้วยุบช่องว่างซ้ำ
     return s.replace(/[{}]/g, "").replace(/\s+/g, " ").trim();
+}
+
+// ─── เศษส่วนซ้อนชั้นจริง (2026-09-26 ผู้ใช้ขอ) ────────────────────────────────────────────────────────
+// เดิมเศษส่วนเป็น (11)/(32) ในบรรทัดเดียว — ตอนนี้แยกเป็นโครงสร้าง ให้ PdfMathText.tsx วาดเป็นกล่องตัวเศษ/เส้น/ตัวส่วน
+// ส่วนอื่นของสูตร (x², √, ×, ÷) ยังใช้ latexToPlain ตัวเดิม · ข้อความที่ไม่มีเศษส่วนไม่ผ่านตรงนี้เลย (hasPdfFraction)
+
+export type PdfMathNode =
+    | { type: "text"; value: string }
+    | { type: "frac"; num: PdfMathNode[]; den: PdfMathNode[] };
+
+const MATH_SEGMENT = /(?<!\\)\$([^$\n]+?)(?<!\\)\$/g;
+const FRAC_COMMAND = /\\[dt]?frac\s*/g;
+
+/** ข้อความนี้มีเศษส่วนในสูตรไหม — ไม่มี = ใช้ <Text> แบบเดิมได้เลย PDF หน้าตาเหมือนเดิมทุกประการ */
+export function hasPdfFraction(text: string | null | undefined): boolean {
+    if (!text || !text.includes("$")) return false;
+    return [...text.matchAll(MATH_SEGMENT)].some((m) => /\\[dt]?frac/.test(m[1]));
+}
+
+// อ่าน {…} ที่ตำแหน่ง start (ข้ามช่องว่างนำหน้าได้) รองรับปีกกาซ้อน เช่น \frac{\frac{1}{2}}{3}
+function readGroup(s: string, start: number): { content: string; end: number } | null {
+    let i = start;
+    while (s[i] === " ") i++;
+    if (s[i] !== "{") return null;
+    let depth = 0;
+    for (let j = i; j < s.length; j++) {
+        if (s[j] === "{") depth++;
+        else if (s[j] === "}" && --depth === 0) return { content: s.slice(i + 1, j), end: j + 1 };
+    }
+    return null;
+}
+
+function parseLatex(latex: string): PdfMathNode[] {
+    const nodes: PdfMathNode[] = [];
+    let buffer = "";
+    const flush = () => {
+        const plain = latexToPlain(buffer);
+        if (plain) nodes.push({ type: "text", value: plain });
+        buffer = "";
+    };
+    let i = 0;
+    while (i < latex.length) {
+        FRAC_COMMAND.lastIndex = i;
+        const m = FRAC_COMMAND.exec(latex);
+        if (!m) { buffer += latex.slice(i); break; }
+        buffer += latex.slice(i, m.index);
+        const num = readGroup(latex, m.index + m[0].length);
+        const den = num && readGroup(latex, num.end);
+        if (!num || !den) {
+            // ปีกกาไม่ครบ (แอดมินพิมพ์ผิด) — ปล่อยเป็นข้อความให้ latexToPlain จัดการเหมือนเดิม ไม่พัง
+            buffer += m[0];
+            i = m.index + m[0].length;
+            continue;
+        }
+        flush();
+        nodes.push({ type: "frac", num: parseLatex(num.content), den: parseLatex(den.content) });
+        i = den.end;
+    }
+    flush();
+    return nodes;
+}
+
+/** แยกข้อความ 1 บรรทัด (ห้ามมี \n) เป็น ข้อความธรรมดา + ชิ้นสูตร */
+export function parsePdfMathLine(line: string): PdfMathNode[] {
+    const nodes: PdfMathNode[] = [];
+    let last = 0;
+    for (const m of line.matchAll(MATH_SEGMENT)) {
+        const before = line.slice(last, m.index).replace(/\\\$/g, "$");
+        if (before) nodes.push({ type: "text", value: before });
+        nodes.push(...parseLatex(m[1]));
+        last = m.index! + m[0].length;
+    }
+    const rest = line.slice(last).replace(/\\\$/g, "$");
+    if (rest) nodes.push({ type: "text", value: rest });
+    return nodes;
 }
 
 /**
