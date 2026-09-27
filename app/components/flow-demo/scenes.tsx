@@ -57,14 +57,21 @@ export type DemoData = {
 
 export type Waypoint = { at: number; target: string; x?: number; y?: number };
 
-export type Scene = {
+// โหมดทำข้อสอบที่กำลังเล่าเรื่อง — ขั้น "เลือกโหมด" มีปุ่มให้คนดูสลับเองได้ และสลับให้เองทุกรอบ (ดู FlowDemo)
+export type ExamMode = "timed" | "practice";
+
+type SceneInfo = { title: string; caption: string; duration: number; waypoints: Waypoint[] };
+
+export type Scene = SceneInfo & {
     key: string;
-    title: string;
-    caption: string;
-    duration: number;
-    waypoints: Waypoint[];
-    render: (props: { t: number; demo: DemoData }) => ReactNode;
+    // ค่าที่ต่างไปตามโหมด (ชื่อขั้น คำอธิบาย ความยาว จุดกด) — ไม่ใส่ = ใช้ค่าเดียวกันทั้งสองโหมด
+    byMode?: Partial<Record<ExamMode, Partial<SceneInfo>>>;
+    render: (props: { t: number; demo: DemoData; mode: ExamMode }) => ReactNode;
 };
+
+export function resolveScene(scene: Scene, mode: ExamMode): Scene {
+    return { ...scene, ...scene.byMode?.[mode] };
+}
 
 // ชุดสำรองตอนร้านยังไม่มีชุดที่ขาย (ฐานข้อมูลเปล่า) — ฉากต้องยังเล่นได้
 const FALLBACK_PRODUCT: Product = {
@@ -596,7 +603,7 @@ const clock = (seconds: number) =>
 
 // ── ฉาก 4: เลือกชุดในคลัง + เลือกโหมด ────────────────────────────────────────────────────────────────
 
-const S4 = { scrollOwned: 700, tapStart: 1800, mode: 2300, tapTimed: 3500, tapBegin: 4900, end: 6200 };
+const S4 = { scrollOwned: 700, tapStart: 1800, mode: 2300, tapMode: 3500, tapBegin: 4900, end: 6200 };
 
 function ModeCard({
     icon: Icon,
@@ -653,7 +660,7 @@ const LIBRARY_SHORTCUTS = [
     },
 ];
 
-function SceneStart({ t, demo }: { t: number; demo: DemoData }) {
+function SceneStart({ t, demo, mode }: { t: number; demo: DemoData; mode: ExamMode }) {
     const { product } = demo;
     if (t < S4.mode) {
         return (
@@ -701,7 +708,8 @@ function SceneStart({ t, demo }: { t: number; demo: DemoData }) {
         );
     }
 
-    const timed = t >= S4.tapTimed;
+    // หน้าจริงเลือกโหมดฝึกไว้ให้ก่อนเสมอ — โหมดจับเวลาจึงเห็นการ์ดเปลี่ยนตอนกด ส่วนโหมดฝึกกดยืนยันการ์ดเดิม
+    const timed = mode === "timed" && t >= S4.tapMode;
     return (
         <Page pageKey="mode" nav={<DemoNavbar />}>
             <main className="px-4 py-12">
@@ -752,7 +760,8 @@ const S5 = {
 };
 const SKIPPED_MINUTES = 45;
 
-function SceneExam({ t, demo }: { t: number; demo: DemoData }) {
+function SceneExam({ t, demo, mode }: { t: number; demo: DemoData; mode: ExamMode }) {
+    if (mode === "practice") return <ScenePractice t={t} demo={demo} />;
     const total = demo.product.question_count;
     // ข้อไหน / เลือกแล้วหรือยัง / ตอบไปกี่ข้อ ณ เวลา t
     let index = 0;
@@ -873,12 +882,182 @@ function SceneExam({ t, demo }: { t: number; demo: DemoData }) {
     );
 }
 
+// ── ฉาก 5 (โหมดฝึก): ตอบแล้วเฉลยขึ้นทันที ─────────────────────────────────────────────────────────
+// ตาม QuestionCard ใน ExamRunner ตอนมี reveal: ข้อที่ถูก = เขียว, ข้อที่เลือกผิด = แดง, ข้ออื่นจาง,
+// เหตุผลใต้ตัวเลือกที่ผิด (แดงถ้าเป็นข้อที่เลือก) + กล่องวิธีคิด · ไม่มีตัวจับเวลา (deadline = null)
+
+type PracticeQuestion = DemoQuestion & { reasons: Record<number, string>; explanation: string };
+
+const PRACTICE_QUESTIONS: PracticeQuestion[] = [
+    {
+        ...EXAM_QUESTIONS[0],
+        pick: 2, // ตอบถูก
+        reasons: {
+            0: "บวก 12 เท่าเดิม แต่โจทย์คูณ 2 ทุกครั้ง",
+            1: "บวก 18 ไม่ตรงกับรูปแบบใดของโจทย์",
+            3: "ใกล้เคียง 48 แต่ไม่ได้มาจากการคูณ 2",
+        },
+        explanation: "แต่ละพจน์คูณด้วย 2 เสมอ: 3×2=6, 6×2=12, 12×2=24\nตัวถัดไป = 24 × 2 = 48",
+    },
+    {
+        ...EXAM_QUESTIONS[1],
+        pick: 0, // ตอบผิด — ให้เห็นเฉลยของข้อที่เลือกผิดด้วย
+        reasons: {
+            0: "โรงพยาบาลเป็นที่รักษาคน ไม่ใช่ที่รวบรวมยาไว้ให้หยิบ",
+            2: "แพทย์คือคนสั่งยา ไม่ใช่สถานที่",
+            3: "คนไข้คือคนใช้ยา ไม่ใช่สถานที่",
+        },
+        explanation: "หนังสือถูกรวบรวมไว้ที่ห้องสมุด → หาสถานที่ที่รวบรวมยาไว้ = ร้านขายยา\nความสัมพันธ์: สิ่งของ : สถานที่ที่รวบรวมสิ่งนั้น",
+    },
+    {
+        ...EXAM_QUESTIONS[3],
+        pick: 0, // ตอบถูก
+        reasons: {
+            1: "“กระเพรา” ไม่มี ร หลัง ก และ “ผัดไท” ต้องมี ย",
+            2: "“กะเพา” ขาด ร",
+            3: "ผิดทั้งสองคำ",
+        },
+        explanation: "เขียนว่า “กะเพรา” (ไม่มี ร หลัง ก) และ “ผัดไทย” (มี ย) ตามพจนานุกรมฉบับราชบัณฑิตยสถาน",
+    },
+];
+
+// เวลาในฉาก: แต่ละข้อ = โผล่ → กดตอบ (เฉลยขึ้นทันที) → เลื่อนลงให้เห็นเฉลยครบ → กดถัดไป
+const S5P = {
+    q: [
+        { show: 0, pick: 1300, scroll: 1900, next: 4300 },
+        { show: 4400, pick: 5600, scroll: 6200, next: 8700 },
+    ],
+    skip: 8800,
+    last: { show: 9900, pick: 11000, scroll: 11600, submit: 13600 },
+    end: 14800,
+};
+
+function ScenePractice({ t, demo }: { t: number; demo: DemoData }) {
+    const total = demo.product.question_count;
+    const r = demoResult(total);
+    const onLast = t >= S5P.last.show;
+    const slot = onLast ? 2 : t >= S5P.q[1].show ? 1 : 0;
+    const step = onLast ? S5P.last : S5P.q[slot];
+    const q = PRACTICE_QUESTIONS[slot];
+    const index = onLast ? total - 1 : slot;
+    const revealed = t >= step.pick;
+    const answered = onLast ? total - r.skipped - 1 + (revealed ? 1 : 0) : slot + (revealed ? 1 : 0);
+    const submitting = onLast && t >= S5P.last.submit + 50;
+
+    return (
+        <Page
+            pageKey="exam"
+            className="bg-slate-50"
+            scrollTo={t >= step.scroll ? "choices" : undefined}
+            overlay={
+                <>
+                    <div className="absolute top-6 right-3 z-10">
+                        <Card className="p-2 flex items-center justify-center shadow-xl shadow-slate-900/10">
+                            <span className="flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-slate-500">
+                                <PanelRightOpen size={20} />
+                                <span className="text-[11px] font-medium tabular-nums">
+                                    {answered}/{total}
+                                </span>
+                            </span>
+                        </Card>
+                    </div>
+                    <div
+                        className={cn(
+                            "absolute inset-0 z-20 flex items-center justify-center bg-slate-900/40 backdrop-blur-[2px] transition-opacity duration-300",
+                            t >= S5P.skip && t < S5P.last.show ? "opacity-100" : "opacity-0"
+                        )}
+                    >
+                        <span className="rounded-full bg-white px-5 py-2.5 text-sm font-medium text-slate-700 shadow-lg">
+                            ⏩ ทำต่อจนครบทุกข้อ
+                        </span>
+                    </div>
+                </>
+            }
+        >
+            <div className="px-4 py-8 flex flex-col">
+                <div className="flex items-center justify-between mb-2 text-sm text-slate-500 pr-20">
+                    <span className="flex items-center gap-1.5 text-slate-400">
+                        <LogOut size={16} />
+                    </span>
+                    <span>
+                        ข้อ {index + 1} จาก {total}
+                    </span>
+                    {/* โหมดฝึกไม่มีตัวจับเวลา — ของจริงเว้นช่องไว้เปล่าๆ */}
+                    <span />
+                </div>
+                <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden mb-4">
+                    <div className="h-full bg-brand-500 rounded-full transition-all" style={{ width: `${((index + 1) / total) * 100}%` }} />
+                </div>
+                <div className="flex items-center justify-center gap-1 rounded-full bg-slate-100 p-1 text-sm mb-8">
+                    <span className="rounded-full px-3.5 py-1.5 font-medium bg-white text-brand-600 shadow-sm">ทีละข้อ</span>
+                    <span className="rounded-full px-3.5 py-1.5 font-medium text-slate-500">แสดงทุกข้อ</span>
+                </div>
+
+                <Card key={index} className="flow-page-in p-6 flex flex-col">
+                    <div className="flex items-center justify-end mb-2">
+                        <span className="flex items-center gap-1 rounded-full px-2 py-1 text-xs text-slate-300">
+                            <Flag size={15} />
+                        </span>
+                    </div>
+                    <p className="text-lg font-medium text-slate-900 mb-6 leading-relaxed">{q.text}</p>
+                    <div className="flex flex-col gap-3" data-demo-anchor="choices">
+                        {q.choices.map((c, i) => {
+                            const isCorrect = i === q.answer;
+                            const isPicked = i === q.pick;
+                            return (
+                                <div key={c}>
+                                    <span
+                                        data-demo={`choice-${i}`}
+                                        className={cn(
+                                            "w-full text-left px-4 py-3 rounded-xl border-2 transition-all flex items-start justify-between gap-3",
+                                            !revealed && "border-slate-200",
+                                            revealed && isCorrect && "border-green-400 bg-green-50",
+                                            revealed && isPicked && !isCorrect && "border-red-300 bg-red-50",
+                                            revealed && !isCorrect && !isPicked && "border-slate-100 text-slate-400"
+                                        )}
+                                    >
+                                        <span className="flex-1">{c}</span>
+                                        {revealed && isCorrect && <Check size={18} className="flow-pop text-green-600 shrink-0" />}
+                                        {revealed && isPicked && !isCorrect && <X size={18} className="flow-pop text-red-500 shrink-0" />}
+                                    </span>
+                                    {revealed && !isCorrect && q.reasons[i] && (
+                                        <p className={cn("flow-page-in text-xs mt-1.5 px-1", isPicked ? "text-red-500" : "text-slate-400")}>{q.reasons[i]}</p>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                    {revealed && (
+                        <div className="flow-page-in mt-6 p-4 rounded-xl bg-brand-50/60 border border-brand-100">
+                            <p className="text-sm font-medium text-brand-700 mb-1.5">วิธีคิด</p>
+                            <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-line">{q.explanation}</p>
+                        </div>
+                    )}
+                </Card>
+
+                <div className="flex items-center justify-between mt-6">
+                    <Button variant="secondary" disabled={index === 0}>
+                        <ChevronLeft size={18} />
+                        ข้อก่อนหน้า
+                    </Button>
+                    <span data-demo="exam-next">
+                        <Button disabled={submitting}>
+                            {onLast ? (submitting ? "กำลังส่ง..." : "ส่งคำตอบ") : "ข้อถัดไป"}
+                            {!onLast && <ChevronRight size={18} />}
+                        </Button>
+                    </span>
+                </div>
+            </div>
+        </Page>
+    );
+}
+
 // ── ฉาก 6: ดูผลสอบ ───────────────────────────────────────────────────────────────────────────────
 // คะแนนนับขึ้น → "ถ้าสอบวันนี้ ผ่านไหม" (ReadinessCard ตัวจริง) → เทียบกับคนอื่น → สรุป → ผลรายหมวด
 
 const S6 = { countFrom: 400, countTo: 1600, scrollPeer: 3600, scrollTopics: 6200, end: 9400 };
 
-function SceneResult({ t, demo }: { t: number; demo: DemoData }) {
+function SceneResult({ t, demo, mode }: { t: number; demo: DemoData; mode: ExamMode }) {
     const r = demoResult(demo.product.question_count);
     const progress = Math.min(1, Math.max(0, (t - S6.countFrom) / (S6.countTo - S6.countFrom)));
     const shown = Math.round(r.percent * (1 - Math.pow(1 - progress, 3)));
@@ -912,12 +1091,16 @@ function SceneResult({ t, demo }: { t: number; demo: DemoData }) {
                         },
                         subjects: [],
                     }}
-                    pace={{
-                        used_seconds: r.usedSeconds,
-                        limit_seconds: EXAM_MINUTES * 60,
-                        avg_seconds_per_question: r.usedSeconds / r.total,
-                        target_seconds_per_question: (EXAM_MINUTES * 60) / r.total,
-                    }}
+                    pace={
+                        mode === "timed"
+                            ? {
+                                  used_seconds: r.usedSeconds,
+                                  limit_seconds: EXAM_MINUTES * 60,
+                                  avg_seconds_per_question: r.usedSeconds / r.total,
+                                  target_seconds_per_question: (EXAM_MINUTES * 60) / r.total,
+                              }
+                            : null
+                    }
                     scorePercent={shown}
                     skippedCount={r.skipped}
                 />
@@ -1122,19 +1305,28 @@ export const SCENES: Scene[] = [
     {
         key: "start",
         title: "เลือกโหมด เริ่มทำข้อสอบ",
-        caption: "ชุดที่ซื้อเข้าคลังทันที เลือกได้ทั้งโหมดฝึก (เห็นเฉลยทันที) และโหมดจับเวลาเหมือนสอบจริง",
+        caption: "ชุดที่ซื้อเข้าคลังทันที เลือกได้ 2 แบบ — ลองกดดูทีละโหมดได้เลย",
         duration: S4.end,
         waypoints: [
             { at: S4.tapStart, target: "start-exam" },
-            { at: S4.tapTimed, target: "mode-timed" },
+            { at: S4.tapMode, target: "mode-timed" },
             { at: S4.tapBegin, target: "begin" },
         ],
+        byMode: {
+            practice: {
+                waypoints: [
+                    { at: S4.tapStart, target: "start-exam" },
+                    { at: S4.tapMode, target: "mode-practice" },
+                    { at: S4.tapBegin, target: "begin" },
+                ],
+            },
+        },
         render: SceneStart,
     },
     {
         key: "exam",
-        title: "ทำข้อสอบ",
-        caption: "ทำบนเว็บได้จริง มีตัวจับเวลา บันทึกคำตอบให้อัตโนมัติ ปิดแล้วกลับมาทำต่อได้",
+        title: "ทำข้อสอบ (โหมดจับเวลา)",
+        caption: "จับเวลาเหมือนสอบจริง บันทึกคำตอบให้อัตโนมัติ ปิดแล้วกลับมาทำต่อได้ เฉลยทั้งหมดตอนส่ง",
         duration: S5.end,
         waypoints: [
             ...S5.q.flatMap((q, i) => [
@@ -1144,12 +1336,30 @@ export const SCENES: Scene[] = [
             { at: S5.lastPick, target: `choice-${EXAM_QUESTIONS[3].pick}` },
             { at: S5.submit, target: "exam-next" },
         ],
+        byMode: {
+            practice: {
+                title: "ทำข้อสอบ (โหมดฝึก)",
+                caption: "ตอบแล้วเห็นเฉลยทันที ทั้งคำตอบที่ถูก เหตุผลว่าทำไมข้อที่เลือกผิด และวิธีคิด",
+                duration: S5P.end,
+                waypoints: [
+                    ...S5P.q.flatMap((q, i) => [
+                        { at: q.pick, target: `choice-${PRACTICE_QUESTIONS[i].pick}` },
+                        { at: q.next, target: "exam-next" },
+                    ]),
+                    { at: S5P.last.pick, target: `choice-${PRACTICE_QUESTIONS[2].pick}` },
+                    { at: S5P.last.submit, target: "exam-next" },
+                ],
+            },
+        },
         render: SceneExam,
     },
     {
         key: "result",
         title: "ดูผลสอบ",
         caption: "รู้ทันทีว่าถ้าสอบวันนี้ผ่านไหม คะแนนเทียบกับคนอื่นเป็นอย่างไร และหมวดไหนที่ต้องเร่ง",
+        byMode: {
+            timed: { caption: "รู้ทันทีว่าถ้าสอบวันนี้ผ่านไหม ทำทันเวลาไหม คะแนนเทียบกับคนอื่นเป็นอย่างไร และหมวดไหนที่ต้องเร่ง" },
+        },
         duration: S6.end,
         waypoints: [],
         render: SceneResult,
@@ -1163,3 +1373,6 @@ export const SCENES: Scene[] = [
         render: SceneReview,
     },
 ];
+
+/** ขั้นที่มีปุ่มสลับโหมดใน FlowDemo */
+export const MODE_PICK_SCENE = SCENES.findIndex((sc) => sc.key === "start");

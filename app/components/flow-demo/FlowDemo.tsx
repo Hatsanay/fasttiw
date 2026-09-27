@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Pause, Play, Signal, Wifi, BatteryFull } from "lucide-react";
+import { BookOpen, Pause, Play, Signal, Timer, Wifi, BatteryFull } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { Product } from "@/lib/api";
-import { SCENES, pickDemoProducts, type Waypoint } from "./scenes";
+import { MODE_PICK_SCENE, SCENES, pickDemoProducts, resolveScene, type ExamMode, type Waypoint } from "./scenes";
 
 // section "ดูทุกขั้นตอน" ของหน้าแรก (2026-09-27) — motion graphic เล่าการใช้งานจริงบนหน้าจอมือถือจำลอง
 // ตั้งแต่เลือกชุดข้อสอบ → เข้าสู่ระบบ → ชำระเงิน → ... · เปิด/ปิดได้ที่เมนู "เปิดใช้งานระบบ" (landing_flow_demo)
@@ -22,7 +22,13 @@ const SCREEN_H = 740;
 const TICK_MS = 80; // อัปเดตฉาก ~12 ครั้ง/วิ — ความลื่นมาจาก CSS transition ไม่ใช่จำนวนเฟรม
 const CURSOR_LEAD_MS = 600; // เคอร์เซอร์เริ่มเลื่อนไปหาเป้าก่อนกดกี่ ms
 
-type Position = { scene: number; t: number };
+// mode อยู่ใน state ก้อนเดียวกับฉาก/เวลา — ตอนวนรอบต้องสลับโหมดพร้อมกับกลับไปฉากแรกในจังหวะเดียว
+type Position = { scene: number; t: number; mode: ExamMode };
+
+const MODES: { key: ExamMode; label: string; hint: string; icon: typeof BookOpen }[] = [
+    { key: "practice", label: "โหมดฝึก", hint: "เห็นเฉลยทันที", icon: BookOpen },
+    { key: "timed", label: "โหมดจับเวลา", hint: "เหมือนสอบจริง", icon: Timer },
+];
 
 function activeWaypoint(waypoints: Waypoint[], t: number) {
     let current: Waypoint | null = null;
@@ -41,7 +47,9 @@ export default function FlowDemo({ products }: { products: Product[] }) {
     const screenRef = useRef<HTMLDivElement>(null);
     const cursorRef = useRef<HTMLDivElement>(null);
 
-    const [pos, setPos] = useState<Position>({ scene: 0, t: 0 });
+    // รอบแรกเล่นโหมดฝึก (ผู้ใช้สั่ง — เห็นเฉลยทันทีคือจุดขายหลัก) รอบถัดไปโหมดจับเวลา สลับไปเรื่อยๆ
+    // คนที่ดูเฉยๆ 2 รอบก็เห็นครบทั้งสองโหมด
+    const [pos, setPos] = useState<Position>({ scene: 0, t: 0, mode: "practice" });
     const [near, setNear] = useState(false); // สร้างฉากเมื่อเลื่อนใกล้ถึงเท่านั้น — ส่วนต้นหน้าไม่ต้องจ่ายค่าเรนเดอร์
     const [inView, setInView] = useState(false);
     const [userPaused, setUserPaused] = useState(false);
@@ -77,11 +85,11 @@ export default function FlowDemo({ products }: { products: Product[] }) {
         if (process.env.NODE_ENV === "production") return;
         const w = window as unknown as { __flowDemo?: unknown };
         w.__flowDemo = {
-            scenes: SCENES.map((s) => ({ key: s.key, duration: s.duration })),
-            seek: (scene: number, t: number) => {
+            scenes: SCENES.map((s) => ({ key: s.key, duration: s.duration, practiceDuration: resolveScene(s, "practice").duration })),
+            seek: (scene: number, t: number, mode: ExamMode = "timed") => {
                 setNear(true);
                 setUserPaused(true);
-                setPos({ scene, t });
+                setPos({ scene, t, mode });
             },
         };
         return () => {
@@ -112,15 +120,17 @@ export default function FlowDemo({ products }: { products: Product[] }) {
             const now = performance.now();
             const delta = Math.min(now - last, 250);
             last = now;
-            setPos(({ scene, t }) => {
+            setPos(({ scene, t, mode }) => {
                 const next = t + delta;
-                return next >= SCENES[scene].duration ? { scene: (scene + 1) % SCENES.length, t: 0 } : { scene, t: next };
+                if (next < resolveScene(SCENES[scene], mode).duration) return { scene, t: next, mode };
+                const wrapped = scene + 1 >= SCENES.length;
+                return { scene: wrapped ? 0 : scene + 1, t: 0, mode: wrapped ? (mode === "timed" ? "practice" : "timed") : mode };
             });
         }, TICK_MS);
         return () => clearInterval(timer);
     }, [playing]);
 
-    const scene = SCENES[pos.scene];
+    const scene = resolveScene(SCENES[pos.scene], pos.mode);
     const t = reduced ? scene.duration : pos.t;
 
     // เคอร์เซอร์: หาตำแหน่งของปุ่มเป้าหมายจาก DOM จริง (data-demo) — ไม่ hardcode พิกัด layout เปลี่ยนก็ยังชี้ถูก
@@ -142,9 +152,25 @@ export default function FlowDemo({ products }: { products: Product[] }) {
         cursor.dataset.tapping = tapping ? "1" : "0";
     });
 
+    // บนมือถือ รายการขั้นตอนอยู่ใต้กรอบมือถือ — กดแล้วถ้ามองไม่เห็นกรอบ เลื่อนกลับไปให้เห็นว่าฉากเปลี่ยน
+    function revealPhone() {
+        const el = frameRef.current;
+        if (!el) return;
+        const r = el.getBoundingClientRect();
+        if (r.top < 0 || r.bottom > window.innerHeight) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
     function jump(index: number) {
-        setPos({ scene: index, t: 0 });
+        setPos((p) => ({ scene: index, t: 0, mode: p.mode }));
         setUserPaused(false);
+        revealPhone();
+    }
+
+    // กดเลือกโหมดเอง = กลับไปขั้นเลือกโหมด นิ้วในมือถือกดการ์ดโหมดนั้น แล้วเล่นทางของโหมดนั้นต่อ
+    function pickMode(mode: ExamMode) {
+        setPos({ scene: MODE_PICK_SCENE, t: 0, mode });
+        setUserPaused(false);
+        revealPhone();
     }
 
     const progress = Math.min(1, t / scene.duration);
@@ -160,7 +186,8 @@ export default function FlowDemo({ products }: { products: Product[] }) {
             <div className="grid lg:grid-cols-[minmax(0,1fr)_auto] gap-8 lg:gap-14 items-center max-w-5xl mx-auto">
                 {/* ขั้นตอน — จอใหญ่อยู่ซ้าย มือถืออยู่ใต้กรอบ (order) */}
                 <ol className="order-2 lg:order-1 flex flex-col gap-2">
-                    {SCENES.map((s, i) => {
+                    {SCENES.map((base, i) => {
+                        const s = resolveScene(base, pos.mode);
                         const active = i === pos.scene;
                         return (
                             <li key={s.key}>
@@ -199,6 +226,43 @@ export default function FlowDemo({ products }: { products: Product[] }) {
                                         </>
                                     )}
                                 </button>
+                                {/* ปุ่มสลับโหมด — อยู่กับขั้นเลือกโหมดตลอด (ไม่ใช่เฉพาะตอนเล่นขั้นนี้) กดเมื่อไหร่ก็ได้ */}
+                                {i === MODE_PICK_SCENE && (
+                                    <div className="mt-2 ml-2 sm:ml-14 grid grid-cols-2 gap-2" role="group" aria-label="เลือกโหมดที่อยากดู">
+                                        {MODES.map((m) => {
+                                            const selected = pos.mode === m.key;
+                                            return (
+                                                <button
+                                                    key={m.key}
+                                                    type="button"
+                                                    onClick={() => pickMode(m.key)}
+                                                    aria-pressed={selected}
+                                                    className={cn(
+                                                        "flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left transition-colors",
+                                                        selected
+                                                            ? "border-brand-300 bg-white shadow-sm ring-1 ring-brand-200"
+                                                            : "border-slate-200 bg-white/60 hover:border-slate-300"
+                                                    )}
+                                                >
+                                                    <span
+                                                        className={cn(
+                                                            "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
+                                                            selected ? "bg-brand-100 text-brand-700" : "bg-slate-100 text-slate-500"
+                                                        )}
+                                                    >
+                                                        <m.icon size={16} />
+                                                    </span>
+                                                    <span className="min-w-0">
+                                                        <span className={cn("block text-sm font-medium", selected ? "text-slate-900" : "text-slate-600")}>
+                                                            {m.label}
+                                                        </span>
+                                                        <span className="block text-xs text-slate-500">{m.hint}</span>
+                                                    </span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
                             </li>
                         );
                     })}
@@ -242,8 +306,8 @@ export default function FlowDemo({ products }: { products: Product[] }) {
                                     </span>
                                 </div>
                                 {near && (
-                                    <div key={scene.key} className="absolute inset-x-0 bottom-0 top-7">
-                                        {scene.render({ t, demo })}
+                                    <div key={`${scene.key}-${pos.mode}`} className="absolute inset-x-0 bottom-0 top-7">
+                                        {scene.render({ t, demo, mode: pos.mode })}
                                     </div>
                                 )}
                                 {/* เคอร์เซอร์นิ้วแตะ — ตำแหน่งคำนวณใน useLayoutEffect */}
