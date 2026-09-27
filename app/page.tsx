@@ -10,6 +10,7 @@ import OutcomeProof from "@/app/components/OutcomeProof";
 import JourneyMockups from "@/app/components/JourneyMockups";
 import DiagnosticPreview from "@/app/components/DiagnosticPreview";
 import FlowDemo from "@/app/components/flow-demo/FlowDemo";
+import PaperDemo from "@/app/components/paper-demo/PaperDemo";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import NewsFeedCard from "@/app/news/NewsFeedCard";
@@ -62,7 +63,9 @@ export default async function HomePage() {
         getOutcomeStats(),
     ]);
     // section ภาพเคลื่อนไหวทุกขั้นตอน — เปิด/ปิดที่เมนู "เปิดใช้งานระบบ" ของแอดมิน (ดู CLAUDE.md ข้อ 6.8)
-    const showFlowDemo = await isFeatureEnabled("landing_flow_demo");
+    // สวิตช์สองตัวไม่ขึ้นต่อกัน อ่านพร้อมกัน · section สอบแบบกระดาษผูกกับสวิตช์ของระบบเอง (paper_exam) — ระบบยังไม่เปิด
+    // ให้ลูกค้าใช้ก็ไม่โฆษณา
+    const [showFlowDemo, showPaperDemo] = await Promise.all([isFeatureEnabled("landing_flow_demo"), isFeatureEnabled("paper_exam")]);
 
     // structured data ระดับเว็บไซต์ — บอก Google ว่าเว็บนี้คือใคร (Organization) และเป็นเว็บไซต์ชื่ออะไร
     // (WebSite) ใช้แสดงผลเป็น knowledge panel / ชื่อแบรนด์ในผลค้นหา — escape "<" กันสตริง "</script>"
@@ -106,6 +109,9 @@ export default async function HomePage() {
                 ) : (
                     <HowItWorks />
                 )}
+
+                {/* สอบแบบกระดาษ — ภาพเคลื่อนไหว สร้างชุดสอบ → พิมพ์ → ฝน → สแกนด้วยมือถือ (CLAUDE.md ข้อ 6.9) */}
+                {showPaperDemo && <PaperDemo products={popularProducts.length > 0 ? popularProducts : products} />}
 
                 {/* แบบทดสอบวัดระดับฟรี — ของที่คนแปลกหน้าได้ทันทีก่อนจ่ายเงิน ขึ้นเฉพาะตอนมีหมวดให้ทำจริง
                     แถบหัวข้อด้านขวาเป็น "ตัวอย่างผล" (ข้อความกำกับไว้) ไม่ใช่ผลของใคร */}

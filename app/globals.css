@@ -137,8 +137,14 @@ body {
   from { transform: scale(1); opacity: 1; }
   to { transform: scale(2.2); opacity: 0; }
 }
+/* section "สอบแบบกระดาษ" (app/components/paper-demo) — วงที่เพิ่งฝนกดลงเป็นวง · ดินสอเลื่อนไปวงถัดไปนุ่มๆ */
+@keyframes paper-mark {
+  from { transform: scale(0.35); opacity: 0.2; }
+}
+.paper-mark { transform-box: fill-box; transform-origin: center; animation: paper-mark 0.22s ease-out; }
+.paper-pencil { transition: transform 0.22s ease-in-out; }
 @media (prefers-reduced-motion: reduce) {
-  .flow-page-in, .flow-pop, .flow-scan-line { animation: none; }
+  .flow-page-in, .flow-pop, .flow-scan-line, .paper-mark { animation: none; }
 }
 
 /* สูตรคณิต (KaTeX) ให้ขนาดเท่าข้อความรอบๆ (2026-09-26 ผู้ใช้ขอ) — CSS ของ KaTeX ตั้ง `.katex { font: 1.21em ... }`
