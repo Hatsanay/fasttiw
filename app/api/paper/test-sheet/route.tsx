@@ -5,11 +5,13 @@ import { paginate } from "@/lib/paper/layout";
 import { labCode } from "@/lib/paper/lab";
 import { testPattern } from "@/lib/paper/testPattern";
 import { isFeatureEnabled } from "@/lib/publicData";
+import { getSession } from "@/lib/session";
 
 // กระดาษคำตอบทดสอบ + ใบบอกวิธีฝน (ระบบสอบกระดาษ เฟส 0 — วัดความแม่นของการอ่านภาพก่อนสร้างระบบจริง)
-// /api/paper/test-sheet?n=100&choices=4&set=1 · เครื่อง dev เปิดได้เสมอ เว็บจริงเฉพาะตอนเปิดฟีเจอร์ paper_exam
+// /api/paper/test-sheet?n=100&choices=4&set=1 · ของทีมงาน: ต้องเปิดสวิตช์ paper_lab + ล็อกอิน (เหมือนหน้า /paper/lab)
+// ไม่ล็อกอินก็ตอบ 404 ไม่ใช่ 401 — ไม่บอกคนนอกว่ามี endpoint นี้ · สร้าง PDF หนัก (สูงสุด 300 ข้อ) ห้ามเปิดให้ใครยิงก็ได้
 export async function GET(req: Request) {
-    if (process.env.NODE_ENV === "production" && !(await isFeatureEnabled("paper_exam"))) {
+    if (!(await isFeatureEnabled("paper_lab")) || !(await getSession())) {
         return NextResponse.json({ message: "ไม่พบหน้า" }, { status: 404 });
     }
 

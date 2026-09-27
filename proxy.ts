@@ -4,7 +4,8 @@ import type { NextRequest } from "next/server";
 // Next.js 16 เปลี่ยนชื่อ middleware.ts เป็น proxy.ts (ดู tiwwai-store/CLAUDE.md) — ทำ optimistic
 // check เท่านั้น (decode payload คร่าวๆ ไม่ verify ลายเซ็น/ไม่ query DB) ตามคำแนะนำของ Next
 // การตรวจสอบจริงเกิดที่ backend ทุกครั้งที่มีการเรียก API — ที่นี่แค่กันหลงเข้าหน้าที่ยังใช้ไม่ได้เฉยๆ
-const PROTECTED_PREFIXES = ["/checkout", "/library", "/exam", "/history", "/bookmarks", "/account", "/orders", "/welcome"];
+// /paper = หน้าแล็บทดสอบการสแกน (ทีมงาน) — ต้องล็อกอินด้วย ไม่ใช่แค่เปิดสวิตช์ paper_lab (CLAUDE.md ข้อ 6.9)
+const PROTECTED_PREFIXES = ["/checkout", "/library", "/exam", "/history", "/bookmarks", "/account", "/orders", "/welcome", "/paper"];
 const AUTH_PAGES = ["/login", "/register"];
 const COOKIE_NAME = process.env.SESSION_COOKIE_NAME ?? "fasttiw_store_session";
 
