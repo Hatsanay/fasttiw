@@ -55,3 +55,8 @@ body {
 body .katex {
   font-size: 1em;
 }
+
+/* ดอกจันในสูตร (เครื่องหมายนิยามพิเศษ เช่น 8 * 9) ใช้ฟอนต์เดียวกับข้อความ ไม่ใช่ดอกจันเซอริฟของ KaTeX — class มาจาก renderMath() */
+body .katex .math-star {
+  font-family: var(--font-kanit), sans-serif;
+}

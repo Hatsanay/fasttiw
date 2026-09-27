@@ -26,7 +26,15 @@ const SUBSCRIPT: Record<string, string> = {
 
 // คำสั่ง LaTeX ที่มีตัวอักษร Unicode ตรงตัว — แทนได้เลยโดยไม่เสียความหมาย
 const SYMBOLS: [RegExp, string][] = [
+    // เครื่องหมายนิยามพิเศษจากแถบสูตร (2026-09-27) — วาดด้วยฟอนต์สำรองของ KaTeX (ดู ExamPdfDocument.tsx)
+    // ต้องมาก่อนตัวที่ชื่อเป็นคำนำหน้าของมัน: \circledast ก่อน \circ, \diamondsuit ก่อน \diamond
+    [/\\circledast/g, "⊛"], [/\\oplus/g, "⊕"], [/\\otimes/g, "⊗"], [/\\odot/g, "⊙"],
+    [/\\bigtriangleup|\\triangle/g, "△"], [/\\blacksquare/g, "■"], [/\\square/g, "□"],
+    [/\\diamondsuit/g, "♢"], [/\\heartsuit/g, "♡"], [/\\clubsuit/g, "♣"], [/\\spadesuit/g, "♠"],
+    [/\\diamond/g, "⋄"], [/\\lozenge/g, "◊"], [/\\bigstar/g, "★"], [/\\star/g, "⋆"], [/\\bigcirc/g, "◯"],
+    [/\\bullet/g, "∙"], [/\\dagger/g, "†"], [/\\#/g, "#"],
     [/\\times/g, "×"], [/\\div/g, "÷"], [/\\pm/g, "±"], [/\\mp/g, "∓"],
+    // `*` เฉยๆ ปล่อยไว้ — ฟอนต์ Kanit วาดดอกจันชิดบนอยู่แล้ว ตรงกับบนเว็บ (katexSource ใน lib/mathParse.ts)
     [/\\cdot/g, "·"], [/\\ast/g, "*"],
     [/\\neq/g, "≠"], [/\\leq/g, "≤"], [/\\geq/g, "≥"], [/\\approx/g, "≈"], [/\\equiv/g, "≡"],
     [/\\infty/g, "∞"], [/\\degree/g, "°"], [/\\circ/g, "°"], [/\\%/g, "%"],
@@ -71,7 +79,8 @@ function latexToPlain(latex: string): string {
         s = s.replace(/_\s*(\w)/g, (_m, x: string) => SUBSCRIPT[x] ?? `_${x}`);
 
         // ข้อความในสูตร \text{...} เอาเนื้อในมาตรงๆ
-        s = s.replace(/\\(?:text|mathrm|mathbf|operatorname)\s*\{([^{}]*)\}/g, "$1");
+        // \mathbin{...} ฯลฯ มีผลแค่ระยะห่างบนเว็บ (แถบสูตรใช้กับเครื่องหมายอย่าง □ ★ ให้เว้นวรรคแบบเครื่องหมายดำเนินการ)
+        s = s.replace(/\\(?:text|mathrm|mathbf|operatorname|mathbin|mathrel|mathord)\s*\{([^{}]*)\}/g, "$1");
 
         if (s === before) break;
     }

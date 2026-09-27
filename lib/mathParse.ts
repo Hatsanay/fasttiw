@@ -27,7 +27,29 @@ const MATH_TEST = /(?<!\\)\$[^$\n]+?(?<!\\)\$/;
 // บรรทัดที่มีเศษส่วนสูงขึ้นเล็กน้อย
 // ตัวเรนเดอร์ทั้งสองฝั่ง (lib/math.tsx, lib/mathClient.tsx) ต้องเรียกผ่านฟังก์ชันนี้ ขนาดสูตรจะได้ตรงกันทุกหน้า
 export function katexSource(latex: string): string {
-    return `\\displaystyle ${latex}`;
+    return `\\displaystyle ${textAsterisk(latex)}`;
+}
+
+// `*` ในสูตร = ดอกจันแบบตัวหนังสือ ชิดบน (2026-09-27 ผู้ใช้ขอ) — ข้อสอบใช้เป็น "เครื่องหมายนิยามพิเศษ" เช่น
+// `ถ้า 8 * 9 = 17` ต้องหน้าตาเหมือนพิมพ์ธรรมดา ไม่ใช่ดอกจันกลางบรรทัด (∗) ที่ KaTeX วาดให้ และไม่ใช่เครื่องหมายคูณ
+// \mathbin คงระยะห่างซ้าย-ขวาแบบเครื่องหมายดำเนินการ · หลัง ^ หรือ _ ใส่ \mathbin ตรงๆ ไม่ได้ (KaTeX error)
+// จึงครอบปีกกาแทน · ดอกจันกลางแบบเดิมพิมพ์ `\ast` · ต้องตรงกับฝั่งแอดมิน (frontend/app/lib/math.tsx)
+function textAsterisk(latex: string): string {
+    return latex.replace(/([\^_]\s*)?\*/g, (_m, script?: string) =>
+        script ? `${script}{\\text{*}}` : "\\mathbin{\\text{*}}");
+}
+
+/**
+ * วาดสูตร 1 ก้อนเป็น HTML — ตัวเรนเดอร์ทุกตัวเรียกผ่านที่นี่ (รับ katex เป็นพารามิเตอร์ ไฟล์นี้จึงไม่ดึง KaTeX เข้า bundle)
+ *
+ * ดอกจันจาก \text{*} ยังเป็นฟอนต์ของ KaTeX (ดอกจันเซอริฟ หน้าตาไม่เหมือนที่พิมพ์) จึงติด class `math-star` ให้
+ * แล้ว globals.css สั่งให้ใช้ฟอนต์เดียวกับข้อความ · KaTeX วาด `*` ในโหมดสูตรเป็น ∗ (U+2217) เสมอ ดอกจัน ASCII
+ * ในผลลัพธ์จึงมาจากโหมดตัวหนังสือเท่านั้น ไม่ไปโดนสัญลักษณ์อื่น
+ */
+export function renderMath(katex: { renderToString: (tex: string, options: object) => string }, latex: string): string {
+    return katex
+        .renderToString(katexSource(latex), { throwOnError: false, output: "html" })
+        .replace(/<span class="mord( mtight)?">\*<\/span>/g, '<span class="mord$1 math-star">*</span>');
 }
 
 export type MathSegment = { type: "text" | "math"; value: string };

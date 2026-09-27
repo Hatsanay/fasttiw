@@ -18,11 +18,17 @@ Font.register({
         { src: join(process.cwd(), "app/assets/Kanit-SemiBold.ttf"), fontWeight: "semibold" },
     ],
 });
+// ฟอนต์สำรองสำหรับเครื่องหมายที่ Kanit ไม่มี (2026-09-27) — ⊕ ⊗ □ ★ ◯ ⋄ ✓ ฯลฯ ที่แอดมินแทรกจากแถบสูตร
+// (เครื่องหมายนิยามพิเศษ) · react-pdf เลือกฟอนต์รายตัวอักษรตามลำดับใน `fontFamily` ข้อความไทยจึงยังใช้ Kanit ทั้งหมด
+// · ใช้ฟอนต์ของ KaTeX เพราะบนเว็บวาดเครื่องหมายพวกนี้ด้วยฟอนต์ชุดนี้อยู่แล้ว (สัญญาอนุญาต MIT) — เครื่องหมายที่
+// เว็บแสดงได้ PDF ก็มีครบ · ไม่มีตัวหนา ตัวอักษรหนาใช้ตัวปกติแทน
+Font.register({ family: "KaTeXMain", src: join(process.cwd(), "app/assets/KaTeX_Main-Regular.ttf") });
+Font.register({ family: "KaTeXAMS", src: join(process.cwd(), "app/assets/KaTeX_AMS-Regular.ttf") });
 
 const THAI_CHOICE_LETTERS = ["ก", "ข", "ค", "ง", "จ", "ฉ", "ช", "ซ", "ฌ", "ญ"];
 
 const styles = StyleSheet.create({
-    page: { fontFamily: "Kanit", fontSize: 11, paddingTop: 50, paddingBottom: 50, paddingHorizontal: 45, color: "#1e293b" },
+    page: { fontFamily: ["Kanit", "KaTeXMain", "KaTeXAMS"], fontSize: 11, paddingTop: 50, paddingBottom: 50, paddingHorizontal: 45, color: "#1e293b" },
 
     // ลายน้ำ: วางกริดลายจางๆ ในกล่องที่ใหญ่กว่าหน้ากระดาษมาก แล้วหมุนเอียง 30 องศา ให้แน่ใจว่าหลังหมุนแล้ว
     // ยังคลุมทุกมุมของหน้า A4 (595x842pt) ไม่มีช่องว่าง — fixed ทำให้ซ้ำทุกหน้าอัตโนมัติ
