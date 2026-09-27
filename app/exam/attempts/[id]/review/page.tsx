@@ -40,7 +40,9 @@ type Review = {
     att_id: string;
     att_product_id: string;
     prod_name: string;
-    att_mode: "practice" | "timed";
+    att_mode: "practice" | "timed" | "paper";
+    /** ผลตรวจกระดาษคำตอบ — รหัสใบสอบ (null = ทำบนเว็บ) */
+    paper_form_code?: string | null;
     att_score: number;
     // สองค่านี้เป็น null ถ้าชุดข้อสอบนั้นไม่ใช้ระบบคะแนน (คิดผลเป็น % จากจำนวนข้อเหมือนเดิม)
     att_earned_score: string | number | null;
@@ -98,7 +100,9 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
     // การลบจะทำให้ข้อที่ถูกปิดไปโผล่เป็น "ตอบผิด" ทั้งที่ลูกค้าอาจตอบถูก
     const skippedCount = review.questions.filter((q) => !q.selected_choice_id).length;
     const wrongCount = review.questions.filter((q) => q.selected_choice_id && !q.is_correct).length;
-    const duration = formatDuration(review.att_started_at, review.att_submitted_at);
+    // สอบแบบกระดาษ: ระบบไม่รู้ว่าทำบนกระดาษนานเท่าไหร่ (เวลาในผลคือตอนส่งตรวจ) — บอกรหัสใบสอบแทน
+    const paperCode = review.paper_form_code ?? null;
+    const duration = paperCode ? null : formatDuration(review.att_started_at, review.att_submitted_at);
     const prevScore = review.prev_score === null ? null : Number(review.prev_score);
     const diff = prevScore === null ? null : Number(review.att_score) - prevScore;
 
@@ -184,6 +188,14 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
                         </span>
                     )}
                     {duration && <span>ใช้เวลา {duration}</span>}
+                    {paperCode && (
+                        <span>
+                            สอบแบบกระดาษ · ใบสอบ{" "}
+                            <Link href={`/exam/paper/forms/${paperCode}`} className="font-medium text-brand-600 hover:underline">
+                                {paperCode}
+                            </Link>
+                        </span>
+                    )}
                     {diff !== null && (
                         <span
                             className={cn(

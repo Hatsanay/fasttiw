@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { BookOpenCheck, ChevronRight, ClipboardList, FileQuestion, Timer } from "lucide-react";
+import { BookOpenCheck, ChevronRight, ClipboardList, FileQuestion, Printer, Timer } from "lucide-react";
 import Navbar from "@/app/components/Navbar";
 import Footer from "@/app/components/Footer";
 import ExportPdfButton from "@/app/components/ExportPdfButton";
@@ -10,6 +10,7 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import { authorizedFetch } from "@/lib/session";
 import { productCoverUrl } from "@/lib/api";
+import { isFeatureEnabled } from "@/lib/publicData";
 
 export const metadata = { title: "คลังข้อสอบของฉัน" };
 
@@ -29,7 +30,8 @@ const STATUS_LABEL: Record<Entitlement["effective_status"], string> = {
 };
 
 export default async function LibraryPage() {
-    const res = await authorizedFetch("/store/my/entitlements");
+    // ปุ่ม "สอบแบบกระดาษ" ขึ้นเฉพาะตอนเปิดฟีเจอร์ paper_exam (เมนู "เปิดใช้งานระบบ" ของแอดมิน)
+    const [res, paperEnabled] = await Promise.all([authorizedFetch("/store/my/entitlements"), isFeatureEnabled("paper_exam")]);
     const { data: entitlements }: { data: Entitlement[] } = res.ok ? await res.json() : { data: [] };
 
     return (
@@ -122,6 +124,15 @@ export default async function LibraryPage() {
                                                     <Link href={`/exam/${e.ent_product_id}`}>
                                                         <Button size="sm" className="w-full">ทำข้อสอบ</Button>
                                                     </Link>
+                                                    {paperEnabled && (
+                                                        <Link
+                                                            href={`/exam/paper/${e.ent_product_id}`}
+                                                            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50/50 py-1.5 text-[11px] font-medium text-brand-700 transition-colors hover:bg-brand-50"
+                                                        >
+                                                            <Printer size={12} />
+                                                            สอบแบบกระดาษ
+                                                        </Link>
+                                                    )}
                                                     <ExportPdfButton productId={e.ent_product_id} />
                                                 </>
                                             ) : (

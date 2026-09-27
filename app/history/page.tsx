@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { History, Timer, BookOpen, TriangleAlert, ListChecks, ChevronRight } from "lucide-react";
+import { History, Timer, BookOpen, TriangleAlert, ListChecks, ChevronRight, ScanLine } from "lucide-react";
 import Navbar from "@/app/components/Navbar";
 import Footer from "@/app/components/Footer";
 import Card from "@/components/ui/Card";
@@ -13,11 +13,18 @@ export const metadata = { title: "ประวัติการทำข้อ�
 
 const PAGE_SIZE = 20;
 
+// ป้ายโหมดของแต่ละครั้ง — "paper" = ผลตรวจกระดาษคำตอบที่สแกนส่งมา (ระบบสอบกระดาษ — CLAUDE.md ข้อ 6.9)
+const MODE_META = {
+    practice: { label: "โหมดฝึก", icon: <BookOpen size={18} />, chip: "bg-brand-50 text-brand-600" },
+    timed: { label: "โหมดจับเวลา", icon: <Timer size={18} />, chip: "bg-amber-50 text-amber-600" },
+    paper: { label: "สอบแบบกระดาษ", icon: <ScanLine size={18} />, chip: "bg-green-50 text-green-600" },
+} as const;
+
 type Attempt = {
     att_id: string;
     att_product_id: string;
     prod_name: string;
-    att_mode: "practice" | "timed";
+    att_mode: "practice" | "timed" | "paper";
     att_status: "in_progress" | "submitted" | "abandoned";
     att_score: string | null;
     // ครั้งที่เท่าไรของชุดนี้ + คะแนนครั้งก่อนของชุดเดียวกัน (backend คิดจากข้อมูลทั้งหมดก่อนตัดหน้า)
@@ -366,17 +373,17 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
                                 <span
                                     className={cn(
                                         "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
-                                        a.att_mode === "timed" ? "bg-amber-50 text-amber-600" : "bg-brand-50 text-brand-600"
+                                        MODE_META[a.att_mode].chip
                                     )}
                                 >
-                                    {a.att_mode === "timed" ? <Timer size={18} /> : <BookOpen size={18} />}
+                                    {MODE_META[a.att_mode].icon}
                                 </span>
 
                                 <div className="flex-1 min-w-0">
                                     <p className="font-medium text-slate-800 truncate">{a.prod_name}</p>
                                     <div className="flex items-center gap-2 mt-0.5">
                                         <span className="text-xs text-slate-400">
-                                            {a.att_mode === "timed" ? "โหมดจับเวลา" : "โหมดฝึก"}
+                                            {MODE_META[a.att_mode].label}
                                         </span>
                                         <span className="text-xs text-slate-300">•</span>
                                         <span className="text-xs text-slate-400">

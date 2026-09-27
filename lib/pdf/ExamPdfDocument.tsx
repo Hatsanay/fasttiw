@@ -1,34 +1,21 @@
 // ตั้งชื่อ import ว่า PdfImage (ไม่ใช้ชื่อ Image ตรงๆ) เพราะ eslint-plugin-jsx-a11y จะเข้าใจผิดว่าเป็น
 // <img>/next-image ธรรมดาแล้วเรียกร้อง alt prop ทั้งที่จริงเป็นคนละ component กัน (ของ @react-pdf/renderer
 // สำหรับ render ลง PDF ไม่มี/ไม่ต้องมี alt)
-import { Document, Page, Text, View, Image as PdfImage, StyleSheet, Font } from "@react-pdf/renderer";
+import { Document, Page, Text, View, Image as PdfImage, StyleSheet } from "@react-pdf/renderer";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { toPdfThai } from "./thaiText";
+import { PDF_FONT_FAMILY } from "./fonts";
 // ข้อความที่อาจมีสูตรคณิตผ่าน PdfMathText ทุกจุด — react-pdf เรนเดอร์ HTML ของ KaTeX ไม่ได้ (ดู mathText.ts / PdfMathText.tsx)
 import { PdfMathText } from "./PdfMathText";
 import { hasScoring, formatScore } from "../scoring";
 
-// react-pdf ไม่ผ่าน Next.js font loader เลย (คนละ render pipeline) ต้องลงทะเบียนไฟล์ฟอนต์ตรงๆ เอง
-// เหมือนที่ opengraph-image.tsx ทำไว้แล้ว — ต้องมี glyph ไทยฝังในไฟล์ ใช้ next/font/google ไม่ได้
-Font.register({
-    family: "Kanit",
-    fonts: [
-        { src: join(process.cwd(), "app/assets/Kanit-Regular.ttf"), fontWeight: "normal" },
-        { src: join(process.cwd(), "app/assets/Kanit-SemiBold.ttf"), fontWeight: "semibold" },
-    ],
-});
-// ฟอนต์สำรองสำหรับเครื่องหมายที่ Kanit ไม่มี (2026-09-27) — ⊕ ⊗ □ ★ ◯ ⋄ ✓ ฯลฯ ที่แอดมินแทรกจากแถบสูตร
-// (เครื่องหมายนิยามพิเศษ) · react-pdf เลือกฟอนต์รายตัวอักษรตามลำดับใน `fontFamily` ข้อความไทยจึงยังใช้ Kanit ทั้งหมด
-// · ใช้ฟอนต์ของ KaTeX เพราะบนเว็บวาดเครื่องหมายพวกนี้ด้วยฟอนต์ชุดนี้อยู่แล้ว (สัญญาอนุญาต MIT) — เครื่องหมายที่
-// เว็บแสดงได้ PDF ก็มีครบ · ไม่มีตัวหนา ตัวอักษรหนาใช้ตัวปกติแทน
-Font.register({ family: "KaTeXMain", src: join(process.cwd(), "app/assets/KaTeX_Main-Regular.ttf") });
-Font.register({ family: "KaTeXAMS", src: join(process.cwd(), "app/assets/KaTeX_AMS-Regular.ttf") });
+// ฟอนต์ (Kanit + ฟอนต์สำรองของ KaTeX สำหรับเครื่องหมายพิเศษ) ลงทะเบียนที่ lib/pdf/fonts.ts ใช้ร่วมกับกระดาษคำตอบ
 
 const THAI_CHOICE_LETTERS = ["ก", "ข", "ค", "ง", "จ", "ฉ", "ช", "ซ", "ฌ", "ญ"];
 
 const styles = StyleSheet.create({
-    page: { fontFamily: ["Kanit", "KaTeXMain", "KaTeXAMS"], fontSize: 11, paddingTop: 50, paddingBottom: 50, paddingHorizontal: 45, color: "#1e293b" },
+    page: { fontFamily: PDF_FONT_FAMILY, fontSize: 11, paddingTop: 50, paddingBottom: 50, paddingHorizontal: 45, color: "#1e293b" },
 
     // ลายน้ำ: วางกริดลายจางๆ ในกล่องที่ใหญ่กว่าหน้ากระดาษมาก แล้วหมุนเอียง 30 องศา ให้แน่ใจว่าหลังหมุนแล้ว
     // ยังคลุมทุกมุมของหน้า A4 (595x842pt) ไม่มีช่องว่าง — fixed ทำให้ซ้ำทุกหน้าอัตโนมัติ
@@ -120,8 +107,11 @@ export function ExamPdfDocument({
     totalScore,
     questions,
     watermarkTiledImage,
+    formCode,
 }: {
     productName: string;
+    // รหัสใบสอบกระดาษ (ระบบสอบกระดาษ) — มีค่า = ชุดข้อสอบที่พิมพ์คู่กับกระดาษคำตอบ บอกรหัสให้เทียบว่าเป็นคู่เดียวกัน
+    formCode?: string;
     // null = ชุดนี้ไม่ใช้ระบบคะแนน — PDF จะไม่พิมพ์อะไรเกี่ยวกับคะแนนเลย หน้าตาเหมือนเดิมทุกประการ
     totalScore: string | number | null;
     questions: ExportPdfQuestion[];
@@ -143,7 +133,9 @@ export function ExamPdfDocument({
                     <Text style={styles.meta}>
                         {toPdfThai(
                             `จำนวน ${questions.length} ข้อ${scored ? ` · คะแนนเต็ม ${formatScore(totalScore)} คะแนน` : ""}` +
-                                ` — ใช้สำหรับฝึกทำเท่านั้น ดูเฉลยและวิธีคิดทีละขั้นตอนได้ที่เว็บไซต์`
+                                (formCode
+                                    ? ` · ใบสอบ ${formCode} — ฝนคำตอบในกระดาษคำตอบรหัสเดียวกัน แล้วถ่ายรูปให้ระบบตรวจ`
+                                    : ` — ใช้สำหรับฝึกทำเท่านั้น ดูเฉลยและวิธีคิดทีละขั้นตอนได้ที่เว็บไซต์`)
                         )}
                     </Text>
                 </View>
