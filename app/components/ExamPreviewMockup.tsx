@@ -15,14 +15,29 @@ import {
     NotebookPen,
     QrCode,
     Download,
+    MousePointer2,
 } from "lucide-react";
+import type { CSSProperties } from "react";
 
 // mockup หน้าจอทำข้อสอบ/เฉลย ใช้แทนรูปภาพจริงในหน้า landing — โชว์จุดขายหลัก (เฉลยละเอียด
 // ทีละขั้นตอน) ให้เห็นภาพจริงแทนการบรรยายด้วยตัวหนังสือเฉยๆ
 // การสลับ/rotate อยู่ที่ Hero.tsx (ต้องสลับคู่กับข้อความหัวเรื่องด้วย ไม่ใช่แค่รูป)
-export function DesktopMockup() {
+
+// เวลาเริ่มของแต่ละชิ้นในฉาก (วินาที) — ใส่เป็นตัวแปร CSS `--lm-d` (ดูหัวข้อ motion graphic ใน globals.css)
+const at = (seconds: number) => ({ "--lm-d": `${seconds}s` }) as CSSProperties;
+
+/**
+ * ภาพแรกของ Hero — เล่นเป็นฉาก "ตอบผิด → เห็นคำตอบที่ถูก → วิธีคิดกางออกทีละขั้น → เหตุผลว่าทำไมข้อที่เลือกผิด"
+ * (2026-09-27) เพราะนี่คือจุดต่างจากคู่แข่งที่ขาย PDF (CLAUDE.md ข้อ 1) เห็นแล้วเข้าใจภายใน 5 วินาทีโดยไม่ต้องอ่าน
+ *
+ * `active` = ภาพนี้กำลังแสดงอยู่ → ใส่ class `lm-play` ให้ CSS เล่นฉาก · สลับออกแล้วกลับมาใหม่ = เล่นใหม่ตั้งแต่ต้น
+ * HTML ที่ส่งจาก server มี `lm-play` อยู่แล้ว (ภาพแรกแสดงตั้งแต่โหลด) ฉากจึงเริ่มเล่นโดยไม่ต้องรอ JavaScript
+ * ⚠ ทุกชิ้นมีขนาดคงที่ตลอดฉาก (ขยับแค่สี/ความจาง) — ความสูงของ Hero ผูกกับ mockup ตัวนี้ (ดู Hero.tsx)
+ * ⚠ ความยาวฉาก ~5 วิ ต้องสั้นกว่า durationMs ของภาพนี้ใน Hero.tsx ไม่งั้นสลับไปก่อนเล่นจบ
+ */
+export function DesktopMockup({ active = true }: { active?: boolean }) {
     return (
-        <div className="flex items-center justify-center">
+        <div className={`flex items-center justify-center ${active ? "lm-play" : ""}`}>
             <div className="relative w-full max-w-sm lg:max-w-none">
                 {/* การ์ดหลัก */}
                 <div className="relative rotate-1 rounded-2xl border border-slate-100 bg-white shadow-xl shadow-slate-200/70 overflow-hidden">
@@ -40,22 +55,37 @@ export function DesktopMockup() {
                         <p className="text-xs text-slate-400 mb-2">ข้อ 12 จาก 30</p>
                         <p className="font-medium text-slate-800 mb-4 leading-relaxed">อนุกรมต่อไปนี้ 2, 4, 8, 16, ... ตัวเลขถัดไปคือข้อใด?</p>
 
+                        {/* ฉาก: เคอร์เซอร์กด 24 (0.4s) → 24 แดง (1.3s) → 32 เขียว (1.8s) */}
                         <div className="flex flex-col gap-2 mb-4">
-                            <div className="flex items-center justify-between rounded-lg border-2 border-green-300 bg-green-50 px-3 py-2 text-sm">
+                            <div className="lm-choice flex items-center justify-between rounded-lg border-2 border-green-300 bg-green-50 px-3 py-2 text-sm" style={at(1.8)}>
                                 <span className="text-slate-700">32</span>
-                                <Check size={15} className="text-green-600" />
+                                <Check size={15} className="lm-pop text-green-600" style={at(1.8)} />
                             </div>
-                            <div className="flex items-center justify-between rounded-lg border-2 border-red-200 bg-red-50 px-3 py-2 text-sm">
+                            <div className="lm-choice relative flex items-center justify-between rounded-lg border-2 border-red-200 bg-red-50 px-3 py-2 text-sm" style={at(1.3)}>
                                 <span className="text-slate-700">24</span>
-                                <X size={15} className="text-red-500" />
+                                <X size={15} className="lm-pop text-red-500" style={at(1.3)} />
+                                <MousePointer2
+                                    size={20}
+                                    aria-hidden
+                                    className="lm-cursor pointer-events-none absolute left-10 top-3 fill-slate-800 text-white drop-shadow"
+                                    style={at(0.4)}
+                                />
                             </div>
                             <div className="rounded-lg border border-slate-100 px-3 py-2 text-sm text-slate-400">28</div>
                             <div className="rounded-lg border border-slate-100 px-3 py-2 text-sm text-slate-400">30</div>
                         </div>
 
-                        <div className="rounded-lg bg-brand-50/70 border border-brand-100 p-3">
+                        {/* วิธีคิดทีละขั้น (2.3s →) แล้วตามด้วยเหตุผลว่าทำไมข้อที่เลือกผิด — ครบ 4 อย่างที่หน้าทบทวนต้องมี (CLAUDE.md ข้อ 4) */}
+                        <div className="lm-fade-up rounded-lg bg-brand-50/70 border border-brand-100 p-3" style={at(2.3)}>
                             <p className="text-[11px] font-medium text-brand-700 mb-1">วิธีคิด</p>
-                            <p className="text-xs text-slate-600 leading-relaxed">แต่ละพจน์คูณด้วย 2 เสมอ (2×2=4, 4×2=8, 8×2=16) ดังนั้น 16×2 = 32</p>
+                            <ol className="text-xs text-slate-600 leading-relaxed space-y-0.5">
+                                <li className="lm-fade-up" style={at(2.6)}>1. ดูผลต่าง: 2→4→8→16 เพิ่มขึ้น 2, 4, 8</li>
+                                <li className="lm-fade-up" style={at(3.1)}>2. ผลต่างเพิ่มเท่าตัวทุกครั้ง = แต่ละพจน์คูณ 2</li>
+                                <li className="lm-fade-up" style={at(3.6)}>3. ตัวถัดไป = 16 × 2 = <span className="font-semibold text-green-700">32</span></li>
+                            </ol>
+                            <p className="lm-fade-up mt-2 border-t border-brand-100 pt-2 text-xs text-slate-600 leading-relaxed" style={at(4.2)}>
+                                <span className="font-medium text-red-500">ทำไมไม่ใช่ 24:</span> บวกผลต่าง 8 ซ้ำ แต่ต้องเพิ่มเป็น 16
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -65,7 +95,7 @@ export function DesktopMockup() {
                     <p className="text-[10px] text-slate-400">คะแนนล่าสุด</p>
                     <p className="text-lg font-semibold text-brand-600">92%</p>
                 </div>
-                <div className="absolute -bottom-4 -left-3 sm:-left-6 -rotate-3 flex items-center gap-1.5 rounded-full bg-white shadow-lg shadow-slate-200/80 border border-slate-100 px-3 py-1.5">
+                <div className="lm-pop absolute -bottom-4 -left-3 sm:-left-6 -rotate-3 flex items-center gap-1.5 rounded-full bg-white shadow-lg shadow-slate-200/80 border border-slate-100 px-3 py-1.5" style={at(4.7)}>
                     <span className="flex h-5 w-5 items-center justify-center rounded-full bg-green-100 text-green-600">
                         <Check size={12} />
                     </span>

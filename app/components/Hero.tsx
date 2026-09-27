@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ComponentType } from "react";
 import Link from "next/link";
-import { Sparkles, Smartphone, ListChecks, Timer, Bookmark, History, BadgePercent, LayoutGrid, GraduationCap, NotebookPen, QrCode, Download, ArrowRight, Target } from "lucide-react";
+import { type LucideIcon, Sparkles, Smartphone, ListChecks, Timer, Bookmark, History, BadgePercent, LayoutGrid, GraduationCap, NotebookPen, QrCode, Download, ArrowRight, Target } from "lucide-react";
 import Button from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
 import {
@@ -22,7 +22,19 @@ import {
 
 const ROTATE_MS = 4500;
 
-const VARIANTS = [
+type Variant = {
+    badgeIcon: LucideIcon;
+    badge: string;
+    headlineTop: string;
+    headlineHighlight: string;
+    subtitle: string;
+    // active = ภาพนี้กำลังแสดง — mockup ที่มีฉากเคลื่อนไหวใช้เริ่มเล่นฉาก (ตัวอื่นไม่รับ prop นี้ก็ได้)
+    Mockup: ComponentType<{ active?: boolean }>;
+    // ภาพที่มีฉากเคลื่อนไหวต้องแสดงนานพอให้เล่นจบก่อนสลับ (ไม่ใส่ = ROTATE_MS)
+    durationMs?: number;
+};
+
+const VARIANTS: Variant[] = [
     {
         badgeIcon: Sparkles,
         badge: "เตรียมสอบด้วยเฉลยที่อธิบายวิธีคิดจริง",
@@ -30,6 +42,8 @@ const VARIANTS = [
         headlineHighlight: "พร้อมเฉลยละเอียด",
         subtitle: "เตรียมสอบได้จริง ไม่ใช่แค่อ่าน PDF — ทำโจทย์ ดูผล และเข้าใจวิธีคิดทุกข้อ",
         Mockup: DesktopMockup,
+        // ฉาก "ตอบ → เฉลยกางออก" ยาว ~5 วิ + ค้างให้อ่านอีกนิด (ดู DesktopMockup)
+        durationMs: 8000,
     },
     {
         badgeIcon: Smartphone,
@@ -130,6 +144,15 @@ const VARIANTS = [
 // ตั้งแต่ต้นและไม่กระตุกตอนสลับ · ถ้าเพิ่ม/เรียง mockup ใหม่ ให้ตัวที่สูงที่สุดอยู่ลำดับ 0-1 เสมอ ไม่งั้นเนื้อหาด้านล่าง
 // จะถูกดันลงตอนสลับมาถึงตัวนั้นครั้งแรก
 
+// สลับไปภาพ target พร้อมเตรียมภาพถัดไปไว้ล่วงหน้าหนึ่งตัวเสมอ — ถึงคิวแล้ว crossfade ได้ทันที ไม่ต้องรอสร้าง
+function switchTo(
+    { mounted: prev }: { index: number; mounted: ReadonlySet<number> },
+    target: number
+): { index: number; mounted: ReadonlySet<number> } {
+    const next = (target + 1) % VARIANTS.length;
+    return { index: target, mounted: prev.has(target) && prev.has(next) ? prev : new Set([...prev, target, next]) };
+}
+
 // ข้อความหัวเรื่อง+รูปสลับคู่กันเสมอ (ไม่ใช่สลับแค่รูปแล้วข้อความตายตัว) เพราะแต่ละคู่สื่อจุดขาย
 // คนละด้าน (เฉลยละเอียด / ใช้งานผ่านมือถือง่าย) — ใช้ CSS grid ซ้อนเลเยอร์ (แทน fixed height ที่เดาไว้ผิด)
 // ให้ความสูง container ปรับตามตัวที่สูงสุดอัตโนมัติ กันข้อความ/รูปทับกันตอนความยาวไม่เท่ากัน
@@ -141,18 +164,17 @@ export default function Hero() {
         mounted: new Set([0, 1]),
     }));
 
-    // สลับไปตัวที่ pick เลือก พร้อมเตรียมตัวถัดไปไว้ล่วงหน้าหนึ่งตัวเสมอ — ถึงคิวแล้ว crossfade ได้ทันที ไม่ต้องรอสร้าง
-    const show = (pick: (current: number) => number) =>
-        setView(({ index: current, mounted: prev }) => {
-            const target = pick(current);
-            const next = (target + 1) % VARIANTS.length;
-            return { index: target, mounted: prev.has(target) && prev.has(next) ? prev : new Set([...prev, target, next]) };
-        });
+    const show = (pick: (current: number) => number) => setView((view) => switchTo(view, pick(view.index)));
 
+    // นับเวลาใหม่ทุกครั้งที่เปลี่ยนภาพ (เดิม setInterval คงที่) — แต่ละภาพแสดงนานไม่เท่ากันได้ (durationMs)
+    // และกดจุดเลือกภาพเองแล้วได้เวลาเต็มของภาพนั้น ไม่ถูกสลับทิ้งกลางคัน
     useEffect(() => {
-        const timer = setInterval(() => show((i) => (i + 1) % VARIANTS.length), ROTATE_MS);
-        return () => clearInterval(timer);
-    }, []);
+        const timer = setTimeout(
+            () => setView((view) => switchTo(view, (view.index + 1) % VARIANTS.length)),
+            VARIANTS[index].durationMs ?? ROTATE_MS
+        );
+        return () => clearTimeout(timer);
+    }, [index]);
 
     return (
         <section className="relative overflow-hidden">
@@ -227,7 +249,7 @@ export default function Hero() {
                                     i === index ? "opacity-100" : "opacity-0 pointer-events-none"
                                 )}
                             >
-                                {mounted.has(i) && <v.Mockup />}
+                                {mounted.has(i) && <v.Mockup active={i === index} />}
                             </div>
                         ))}
                     </div>

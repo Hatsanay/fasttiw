@@ -8,20 +8,14 @@ import Reveal from "@/app/components/Reveal";
 import CategoryShowcase from "@/app/components/CategoryShowcase";
 import OutcomeProof from "@/app/components/OutcomeProof";
 import JourneyMockups from "@/app/components/JourneyMockups";
+import DiagnosticPreview from "@/app/components/DiagnosticPreview";
+import FlowDemo from "@/app/components/flow-demo/FlowDemo";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import NewsFeedCard from "@/app/news/NewsFeedCard";
 import { getPublicProducts, getPublicCategories, getPopularProducts, getLandingNewsBlocks, getOutcomeStats } from "@/lib/publicData";
 import { SITE_URL } from "@/lib/site";
-import { getDiagnosticCategories } from "@/lib/publicData";
-import { cn } from "@/lib/cn";
-
-// ภาพประกอบการ์ดแบบทดสอบวัดระดับ — สีและป้ายชุดเดียวกับหน้าผลจริง (DiagnosticResultView)
-const DIAGNOSTIC_PREVIEW = [
-    { name: "อนุกรม", pct: 33, label: "ควรเร่ง", bar: "bg-red-500", chip: "bg-red-50 text-red-600" },
-    { name: "อุปมาอุปไมย", pct: 67, label: "พอใช้", bar: "bg-amber-400", chip: "bg-amber-50 text-amber-700" },
-    { name: "คณิตศาสตร์พื้นฐาน", pct: 100, label: "แน่น", bar: "bg-green-500", chip: "bg-green-50 text-green-700" },
-];
+import { getDiagnosticCategories, isFeatureEnabled } from "@/lib/publicData";
 
 const HIGHLIGHTS = [
     {
@@ -67,6 +61,8 @@ export default async function HomePage() {
         getDiagnosticCategories(),
         getOutcomeStats(),
     ]);
+    // section ภาพเคลื่อนไหวทุกขั้นตอน — เปิด/ปิดที่เมนู "เปิดใช้งานระบบ" ของแอดมิน (ดู CLAUDE.md ข้อ 6.8)
+    const showFlowDemo = await isFeatureEnabled("landing_flow_demo");
 
     // structured data ระดับเว็บไซต์ — บอก Google ว่าเว็บนี้คือใคร (Organization) และเป็นเว็บไซต์ชื่ออะไร
     // (WebSite) ใช้แสดงผลเป็น knowledge panel / ชื่อแบรนด์ในผลค้นหา — escape "<" กันสตริง "</script>"
@@ -103,30 +99,13 @@ export default async function HomePage() {
             <main className="flex-1">
                 <Hero />
 
-                {/* How it works */}
-                <section className="max-w-360 mx-auto px-4 sm:px-6 pb-20">
-                    <Reveal className="text-center mb-12">
-                        <p className="text-sm font-medium text-brand-600 mb-2">ใช้งานง่ายใน 3 ขั้นตอน</p>
-                        <h2 className="text-2xl sm:text-3xl font-semibold text-slate-900">เริ่มเตรียมสอบได้ทันที</h2>
-                    </Reveal>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 sm:gap-6">
-                        {STEPS.map((s, i) => (
-                            <Reveal key={s.title} delay={i * 120} className="relative text-center flex flex-col items-center">
-                                {i < STEPS.length - 1 && (
-                                    <div className="hidden sm:block absolute top-8 left-1/2 w-full h-px bg-linear-to-r from-brand-200 to-transparent" />
-                                )}
-                                <div className="relative z-10 flex h-16 w-16 items-center justify-center rounded-2xl bg-white border border-brand-100 shadow-sm shadow-brand-100 text-brand-600 mb-4">
-                                    <s.icon size={26} />
-                                </div>
-                                <h3 className="font-medium text-slate-800 mb-1.5">
-                                    <span className="text-brand-500 mr-1.5">{i + 1}.</span>
-                                    {s.title}
-                                </h3>
-                                <p className="text-sm text-slate-500 leading-relaxed max-w-[16rem]">{s.description}</p>
-                            </Reveal>
-                        ))}
-                    </div>
-                </section>
+                {/* How it works — เปิดฟีเจอร์ landing_flow_demo แล้วแทนที่ด้วยภาพเคลื่อนไหวทุกขั้นตอน (เล่าเรื่องเดียวกันแต่ละเอียดกว่า
+                    ถ้าเก็บไว้ทั้งคู่จะซ้ำกัน) · ใช้ชุดยอดนิยมจริงของร้านเป็นตัวเล่าเรื่อง */}
+                {showFlowDemo ? (
+                    <FlowDemo products={popularProducts.length > 0 ? popularProducts : products} />
+                ) : (
+                    <HowItWorks />
+                )}
 
                 {/* แบบทดสอบวัดระดับฟรี — ของที่คนแปลกหน้าได้ทันทีก่อนจ่ายเงิน ขึ้นเฉพาะตอนมีหมวดให้ทำจริง
                     แถบหัวข้อด้านขวาเป็น "ตัวอย่างผล" (ข้อความกำกับไว้) ไม่ใช่ผลของใคร */}
@@ -153,20 +132,7 @@ export default async function HomePage() {
                                             <ArrowRight size={18} className="transition-transform group-hover:translate-x-0.5" />
                                         </span>
                                     </div>
-                                    <div className="relative rounded-2xl border border-slate-100 bg-slate-50/60 p-5" aria-hidden>
-                                        <p className="text-xs text-slate-400 mb-3">ตัวอย่างผลที่จะได้</p>
-                                        {DIAGNOSTIC_PREVIEW.map((t) => (
-                                            <div key={t.name} className="mb-3 last:mb-0">
-                                                <div className="flex items-center justify-between text-xs mb-1">
-                                                    <span className="text-slate-600">{t.name}</span>
-                                                    <span className={cn("rounded-full px-2 py-0.5 font-medium", t.chip)}>{t.label}</span>
-                                                </div>
-                                                <div className="h-2 rounded-full bg-white">
-                                                    <div className={cn("h-full rounded-full", t.bar)} style={{ width: `${t.pct}%` }} />
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
+                                    <DiagnosticPreview />
                                 </div>
                             </Link>
                         </Reveal>
@@ -324,5 +290,34 @@ export default async function HomePage() {
             </main>
             <Footer />
         </div>
+    );
+}
+
+// ส่วน "เริ่มเตรียมสอบได้ทันที" 3 ขั้นตอนแบบภาพนิ่ง — แสดงเมื่อปิดฟีเจอร์ landing_flow_demo
+function HowItWorks() {
+    return (
+        <section className="max-w-360 mx-auto px-4 sm:px-6 pb-20">
+            <Reveal className="text-center mb-12">
+                <p className="text-sm font-medium text-brand-600 mb-2">ใช้งานง่ายใน 3 ขั้นตอน</p>
+                <h2 className="text-2xl sm:text-3xl font-semibold text-slate-900">เริ่มเตรียมสอบได้ทันที</h2>
+            </Reveal>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 sm:gap-6">
+                {STEPS.map((s, i) => (
+                    <Reveal key={s.title} delay={i * 120} className="relative text-center flex flex-col items-center">
+                        {i < STEPS.length - 1 && (
+                            <div className="hidden sm:block absolute top-8 left-1/2 w-full h-px bg-linear-to-r from-brand-200 to-transparent" />
+                        )}
+                        <div className="relative z-10 flex h-16 w-16 items-center justify-center rounded-2xl bg-white border border-brand-100 shadow-sm shadow-brand-100 text-brand-600 mb-4">
+                            <s.icon size={26} />
+                        </div>
+                        <h3 className="font-medium text-slate-800 mb-1.5">
+                            <span className="text-brand-500 mr-1.5">{i + 1}.</span>
+                            {s.title}
+                        </h3>
+                        <p className="text-sm text-slate-500 leading-relaxed max-w-[16rem]">{s.description}</p>
+                    </Reveal>
+                ))}
+            </div>
+        </section>
     );
 }

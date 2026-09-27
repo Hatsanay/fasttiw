@@ -49,6 +49,98 @@ body {
   .animate-modal-pop-in { animation: none; }
 }
 
+/* ── motion graphic หน้าแรก (2026-09-27) ────────────────────────────────────────────────────────────────
+   หลักการ: **หน้าตาปกติ (ไม่มี animation) = ฉากจบ** — keyframes ทุกตัวมีแค่ `from` แล้วใช้ fill-mode `backwards`
+   ถอยกลับไปเริ่มเล่น ผลคือ ปิดการเคลื่อนไหว (prefers-reduced-motion) / ยังไม่เข้าจอ / เล่นจบแล้ว = เห็นภาพนิ่ง
+   ครบถ้วนเหมือนเดิม ไม่มีสถานะไหนที่เนื้อหาหายไป
+   · เล่นเมื่อกล่องแม่มี class `lm-play` (Hero ใส่ตอนภาพนั้นกำลังแสดง / DiagnosticPreview ใส่ตอนเลื่อนเข้าจอ)
+   · เวลาเริ่มของแต่ละชิ้นกำหนดผ่านตัวแปร `--lm-d` ที่ style ของชิ้นนั้น
+   · ขยับด้วย transform/opacity/สี เท่านั้น ไม่เปลี่ยนขนาดกล่อง — เนื้อหาด้านล่างไม่กระตุก และมือถือเก่าไม่หน่วง */
+@keyframes lm-fade-up {
+  from { opacity: 0; transform: translateY(6px); }
+}
+@keyframes lm-pop {
+  from { opacity: 0; transform: scale(0.3); }
+  70% { transform: scale(1.15); }
+}
+@keyframes lm-choice-neutral {
+  from { border-color: #f1f5f9; background-color: #ffffff; }
+}
+@keyframes lm-cursor-tap {
+  0% { opacity: 0; transform: translate(90px, 70px); }
+  15% { opacity: 1; }
+  60% { transform: translate(0, 0) scale(1); }
+  70% { transform: translate(0, 0) scale(0.8); }
+  80% { opacity: 1; transform: translate(0, 0) scale(1); }
+  100% { opacity: 0; transform: translate(0, 0) scale(1); }
+}
+@keyframes lm-bar-grow {
+  from { transform: scaleX(0); }
+}
+@keyframes lm-attention {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(239 68 68 / 0); }
+  50% { box-shadow: 0 0 0 5px rgb(239 68 68 / 0.2); }
+}
+.lm-play .lm-fade-up { animation: lm-fade-up 0.45s ease-out var(--lm-d, 0s) backwards; }
+.lm-play .lm-pop { animation: lm-pop 0.4s ease-out var(--lm-d, 0s) backwards; }
+.lm-play .lm-choice { animation: lm-choice-neutral 0.3s ease-out var(--lm-d, 0s) backwards; }
+.lm-play .lm-cursor { animation: lm-cursor-tap 1.1s ease-in-out var(--lm-d, 0s) both; }
+.lm-play .lm-bar { transform-origin: left; animation: lm-bar-grow 0.9s cubic-bezier(0.22, 1, 0.36, 1) var(--lm-d, 0s) backwards; }
+.lm-play .lm-attention { animation: lm-attention 0.9s ease-in-out var(--lm-d, 0s) 2; }
+/* เคอร์เซอร์เป็นของประกอบฉากล้วน — ฉากจบ/ภาพนิ่งต้องไม่มี */
+.lm-cursor { opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .lm-play * { animation: none !important; }
+}
+
+/* ── section "ดูทุกขั้นตอน" (app/components/flow-demo) ───────────────────────────────────────────────
+   เปลี่ยนหน้าในมือถือจำลอง = เลื่อนเข้าจากขวานิดๆ เหมือนเปิดหน้าใหม่ · นิ้วแตะ = วงกลมโปร่งที่ยุบตอนกด + วงกระเพื่อม */
+@keyframes flow-page-in {
+  from { opacity: 0; transform: translateX(14px); }
+}
+.flow-page-in { animation: flow-page-in 0.35s ease-out; }
+@keyframes flow-pop {
+  from { transform: scale(0.3); opacity: 0; }
+  70% { transform: scale(1.15); }
+}
+.flow-pop { animation: flow-pop 0.35s ease-out; }
+@keyframes flow-scan {
+  0%, 100% { top: 6%; }
+  50% { top: 92%; }
+}
+.flow-scan-line { animation: flow-scan 1.6s ease-in-out infinite; }
+.flow-cursor {
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease;
+}
+.flow-cursor-dot {
+  position: absolute;
+  left: -16px;
+  top: -16px;
+  width: 32px;
+  height: 32px;
+  border-radius: 9999px;
+  background: rgb(15 23 42 / 0.28);
+  border: 2px solid rgb(255 255 255 / 0.9);
+  box-shadow: 0 2px 10px rgb(15 23 42 / 0.25);
+  transition: transform 0.15s ease;
+}
+.flow-cursor[data-tapping="1"] .flow-cursor-dot { transform: scale(0.78); }
+.flow-cursor[data-tapping="1"] .flow-cursor-dot::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 9999px;
+  border: 2px solid rgb(43 92 230 / 0.6);
+  animation: flow-ripple 0.45s ease-out forwards;
+}
+@keyframes flow-ripple {
+  from { transform: scale(1); opacity: 1; }
+  to { transform: scale(2.2); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .flow-page-in, .flow-pop, .flow-scan-line { animation: none; }
+}
+
 /* สูตรคณิต (KaTeX) ให้ขนาดเท่าข้อความรอบๆ (2026-09-26 ผู้ใช้ขอ) — CSS ของ KaTeX ตั้ง `.katex { font: 1.21em ... }`
    ตัวเลขในสูตรจึงใหญ่กว่าตัวเลขในข้อความปกติ 21% ในบรรทัดเดียวกัน ดูไม่เท่ากัน · 1em = ตัวเลขสูงเท่าตัวเลขของ Kanit
    (ความสูงตัวเลขของทั้งสองฟอนต์ ~0.64em) · ใช้ `body .katex` ให้ชนะกฎของ KaTeX เสมอ ไม่ว่าไฟล์ CSS ไหนโหลดก่อน */

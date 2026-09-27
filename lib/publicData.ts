@@ -72,6 +72,19 @@ export async function getDiagnosticCategories() {
 }
 
 // ตัวเลขผลสอบจริงขยับช้ามาก (เปลี่ยนตอนลูกค้าตอบแบบสอบถามเท่านั้น) — รีเฟรชทุก 10 นาทีเหมือนเดิม
+// เปิด/ปิดฟีเจอร์ (เมนู "เปิดใช้งานระบบ" ฝั่งแอดมิน) — ค่าเดียวกันสำหรับทุกคน จึง cache ร่วมกันได้
+// แอดมินกดเปิด/ปิดแล้วหน้าเว็บลูกค้าเปลี่ยนตามภายใน ~1 นาที (หน้ายืนยันของแอดมินบอกไว้แล้ว)
+// ⚠ ใช้ซ่อน/แสดงส่วนของหน้าเท่านั้น — ตัวกันจริงอยู่ที่ backend (requireFeature) เสมอ
+export async function getFeatureFlags() {
+    "use cache";
+    cacheLife("minutes");
+    return api.getFeatureFlags();
+}
+
+export async function isFeatureEnabled(key: string): Promise<boolean> {
+    return (await getFeatureFlags())[key] === true;
+}
+
 export async function getOutcomeStats() {
     "use cache";
     cacheLife({ stale: 300, revalidate: 600, expire: 3600 });

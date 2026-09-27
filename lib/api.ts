@@ -206,6 +206,14 @@ export type OutcomeStats = {
     testimonials: { name: string | null; comment: string; outcome: "passed" | "failed"; round_name: string }[];
 };
 
+/** { key: เปิดอยู่ไหม } ของฟีเจอร์ที่ backend ส่งให้หน้าเว็บลูกค้า (เมนู "เปิดใช้งานระบบ" ฝั่งแอดมิน)
+ *  ดึงไม่ได้ = {} → ทุกฟีเจอร์ถือว่าปิด (ฟีเจอร์ใหม่ปิดไว้ก่อนเสมออยู่แล้ว หน้าเว็บจึงเหมือนก่อนมีฟีเจอร์นั้น) */
+export async function getFeatureFlags(): Promise<Record<string, boolean>> {
+    const res = await fetch(`${API_URL}/store/feature-flags`).catch(() => null);
+    if (!res?.ok) return {};
+    return res.json().catch(() => ({}));
+}
+
 export async function getOutcomeStats(): Promise<OutcomeStats> {
     // revalidate 10 นาที — ตัวเลขนี้ขยับช้ามาก (เปลี่ยนตอนลูกค้าตอบแบบสอบถามเท่านั้น)
     // แต่หน้าแรกคือหน้าที่คนเข้าเยอะที่สุด ไม่ควรยิง backend ใหม่ทุกครั้ง
