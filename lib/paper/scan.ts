@@ -1,6 +1,7 @@
 import jsQR from "jsqr";
 import { QUESTIONS_PER_PAGE, decodeSheetId, pageSlots, paginate, type SheetId } from "./layout";
-import { RECTIFY_PX_PER_MM, cropMm, grayToRgba, locateSheet, readBubbles, toGray, type GrayImage, type QuestionReading } from "./omr";
+import { RECTIFY_PX_PER_MM, cropMm, grayToRgba, locateSheet, readSheet, toGray, type GrayImage, type QuestionReading } from "./omr";
+import type { Point } from "./layout";
 
 // ขั้นตอนอ่านรูปกระดาษคำตอบในเบราว์เซอร์ — ใช้ร่วมกันระหว่างหน้าสแกนจริง (/exam/paper/forms/[code]) กับหน้าแล็บ
 // รูป → ภาพขาวดำ → หาแผ่น+ดึงตรง → อ่าน QR (รู้ว่าใบสอบไหน หน้าไหน) → อ่านวงตามผังของใบสอบนั้น
@@ -54,11 +55,17 @@ export function locateGray(img: GrayImage): LocatedPage {
     return { ok: true, id, rect: located.rect };
 }
 
-/** อ่านวงของหน้าหนึ่ง — choiceCounts คือจำนวนวงของทุกข้อทั้งใบ (จากใบสอบ) */
-export function readPage(rect: GrayImage, choiceCounts: number[], page: number): QuestionReading[] | null {
+/** ข้อความที่ลูกค้าเห็นเมื่อกระดาษโค้ง/ยับเกินกว่าจะจัดตำแหน่งวงได้ (omr.ts alignSlots) */
+export const CURLED_PAPER_REASON = "กระดาษโค้งหรือยับเกินไป — วางกระดาษให้เรียบบนโต๊ะ (กดขอบให้แนบ) แล้วถ่ายใหม่";
+
+/**
+ * อ่านวงของหน้าหนึ่ง — choiceCounts คือจำนวนวงของทุกข้อทั้งใบ (จากใบสอบ) · null = ไม่มีหน้านี้
+ * problem ไม่ใช่ null = ต้องปฏิเสธทั้งหน้า ห้ามใช้ readings (กระดาษโค้งจนหาวงที่พิมพ์ไว้ไม่เจอในระยะที่ปลอดภัย)
+ */
+export function readPage(rect: GrayImage, choiceCounts: number[], page: number): { readings: QuestionReading[]; problem: string | null } | null {
     const layout = paginate(choiceCounts)[page - 1];
     if (!layout) return null;
-    return readBubbles(rect, RECTIFY_PX_PER_MM, pageSlots(layout.choiceCounts, layout.firstNumber));
+    return readSheet(rect, RECTIFY_PX_PER_MM, pageSlots(layout.choiceCounts, layout.firstNumber));
 }
 
 /** ภาพขาวดำที่ดึงตรงแล้ว → JPEG สำหรับส่งเก็บ (~150-250KB ต่อหน้า) */
@@ -71,13 +78,14 @@ export function grayToJpeg(img: GrayImage, quality = 0.8): Promise<Blob> {
 }
 
 /** ตัดภาพแถวของข้อหนึ่ง (เลขข้อ + วงทั้งหมด) ไว้ให้ลูกค้าดูตอนยืนยันข้อที่ระบบอ่านไม่ชัด */
-export function cropQuestionRow(rect: GrayImage, choiceCounts: number[], number: number): GrayImage | null {
+export function cropQuestionRow(rect: GrayImage, choiceCounts: number[], number: number, shift: Point = { x: 0, y: 0 }): GrayImage | null {
     const page = Math.ceil(number / QUESTIONS_PER_PAGE);
     const layout = paginate(choiceCounts)[page - 1];
     if (!layout) return null;
     const slot = pageSlots(layout.choiceCounts, layout.firstNumber)[number - layout.firstNumber];
     if (!slot) return null;
     const last = slot.bubbles[slot.bubbles.length - 1];
-    const x = slot.numberAt.x - 9;
-    return cropMm(rect, RECTIFY_PX_PER_MM, x, slot.numberAt.y - 4, last.x + 4.5 - x, 8);
+    // เลื่อนตามที่จัดตำแหน่งเฉพาะที่ตอนอ่าน (กระดาษโค้ง) — ภาพที่ลูกค้าเห็นต้องเป็นแถวเดียวกับที่ระบบอ่านจริง
+    const x = slot.numberAt.x - 9 + shift.x;
+    return cropMm(rect, RECTIFY_PX_PER_MM, x, slot.numberAt.y - 4 + shift.y, last.x + 4.5 - (slot.numberAt.x - 9), 8);
 }

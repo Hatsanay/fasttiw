@@ -6,7 +6,7 @@ import Card from "@/components/ui/Card";
 import { cn } from "@/lib/cn";
 import { CHOICE_LABELS, pageSlots, paginate } from "@/lib/paper/layout";
 import { RECTIFY_PX_PER_MM, grayToRgba, type GrayImage, type QuestionReading } from "@/lib/paper/omr";
-import { locatePage, readPage } from "@/lib/paper/scan";
+import { CURLED_PAPER_REASON, locatePage, readPage } from "@/lib/paper/scan";
 import { parseLabCode } from "@/lib/paper/lab";
 import { describeMark, judge, testPattern, type Mark, type Verdict } from "@/lib/paper/testPattern";
 
@@ -34,8 +34,10 @@ async function analyze(file: File): Promise<Result> {
     if (!spec) return { name: file.name, ok: false, reason: `QR "${id.code}" ไม่ใช่แผ่นทดสอบของแล็บ`, ms: ms() };
     const counts = Array.from({ length: spec.questions }, () => spec.choices);
     const page = paginate(counts)[id.page - 1];
-    const readings = readPage(rect, counts, id.page);
-    if (!page || !readings) return { name: file.name, ok: false, reason: `ไม่มีหน้า ${id.page} ในแผ่นนี้`, ms: ms() };
+    const read = readPage(rect, counts, id.page);
+    if (!page || !read) return { name: file.name, ok: false, reason: `ไม่มีหน้า ${id.page} ในแผ่นนี้`, ms: ms() };
+    if (read.problem) return { name: file.name, ok: false, reason: CURLED_PAPER_REASON, detail: read.problem, ms: ms() };
+    const readings = read.readings;
     const marks = testPattern(spec.code, counts).slice(page.firstNumber - 1, page.firstNumber - 1 + page.choiceCounts.length);
     const rows = readings.map((reading, i) => ({ reading, mark: marks[i], verdict: judge(marks[i], reading.reading) }));
     return { name: file.name, ok: true, code: id.code, page: id.page, pages: id.pages, rect, rows, ms: ms() };

@@ -249,7 +249,20 @@ export function rectify(img: GrayImage, sheetToImage: number[], pxPerMm: number)
  * (≈ 0.3-0.5 มม. บนกระดาษ) ซึ่งพอให้วงแถวล่างสุดคลาดตำแหน่ง จึงหาจุดกลางของสี่เหลี่ยมใหม่บนภาพที่ดึงตรงแล้ว
  * แล้วคำนวณ homography ใหม่อีกรอบ
  */
-function refineCorners(rect: GrayImage, pxPerMm: number): Point[] | null {
+/** ความสว่างเฉลี่ยในกล่องสี่เหลี่ยมจัตุรัสรอบจุด (พิกเซล) */
+function meanBox(rect: GrayImage, cx: number, cy: number, half: number): number {
+    let sum = 0;
+    let n = 0;
+    for (let y = Math.max(0, cy - half); y <= Math.min(rect.height - 1, cy + half); y++) {
+        for (let x = Math.max(0, cx - half); x <= Math.min(rect.width - 1, cx + half); x++) {
+            sum += rect.data[y * rect.width + x];
+            n++;
+        }
+    }
+    return n ? sum / n : 255;
+}
+
+export function refineCorners(rect: GrayImage, pxPerMm: number): Point[] | null {
     const out: Point[] = [];
     for (const f of FIDUCIALS) {
         const r = Math.round(FIDUCIAL_SIZE * pxPerMm);
@@ -258,8 +271,13 @@ function refineCorners(rect: GrayImage, pxPerMm: number): Point[] | null {
         let sx = 0;
         let sy = 0;
         let n = 0;
-        // เกณฑ์ดำเทียบกับกระดาษรอบๆ ไม่ใช่ค่าตายตัว — รูปแสงน้อย กระดาษขาวอาจเหลือแค่เทา ~120
-        const dark = localWhite(rect, cx0, cy0, r) * 0.55;
+        // เกณฑ์ดำ = กึ่งกลางระหว่าง "ด้านในสี่เหลี่ยม" กับ "กระดาษรอบๆ" ของมุมนั้นเอง
+        // เดิมใช้ 55% ของกระดาษขาวที่สว่างที่สุดในกล่อง — มุมที่อยู่ในเงามือ (ขอบเงาคม) กระดาษฝั่งที่โดนเงาเข้มกว่าเกณฑ์
+        // ถูกนับเป็นสี่เหลี่ยม มุมถูกดึงเข้าไปในเงา แล้วทั้งแผ่นโดนปฏิเสธ (เจอจากรูปกระดาษจริง 2026-09-28)
+        const white = localWhite(rect, cx0, cy0, r);
+        const core = meanBox(rect, cx0, cy0, Math.round(r * 0.3));
+        if (white - core < 25) return null; // มองไม่เห็นสี่เหลี่ยมชัดพอ — ไม่ปรับดีกว่าปรับผิด
+        const dark = (white + core) / 2;
         for (let y = cy0 - r; y <= cy0 + r; y++) {
             for (let x = cx0 - r; x <= cx0 + r; x++) {
                 if (x < 0 || y < 0 || x >= rect.width || y >= rect.height) continue;
@@ -271,8 +289,12 @@ function refineCorners(rect: GrayImage, pxPerMm: number): Point[] | null {
             }
         }
         // ต้องเจอพิกเซลดำอย่างน้อยครึ่งหนึ่งของสี่เหลี่ยม ไม่งั้นแปลว่ารอบแรกผิดไปไกล ไม่ปรับดีกว่า
-        if (n < (FIDUCIAL_SIZE * pxPerMm) ** 2 * 0.5) return null;
-        out.push({ x: (sx / n + 0.5) / pxPerMm, y: (sy / n + 0.5) / pxPerMm });
+        // และต้องไม่มากเกิน 1.6 เท่า (เงา/ของดำอื่นติดเข้ามาในกล่อง) · จุดใหม่ต้องห่างจุดเดิมไม่เกิน 2 มม.
+        const area = (FIDUCIAL_SIZE * pxPerMm) ** 2;
+        if (n < area * 0.5 || n > area * 1.6) return null;
+        const p = { x: (sx / n + 0.5) / pxPerMm, y: (sy / n + 0.5) / pxPerMm };
+        if (Math.hypot(p.x - f.x, p.y - f.y) > 2) return null;
+        out.push(p);
     }
     return out;
 }
@@ -284,15 +306,28 @@ export type Reading =
     | { kind: "blank" } // ไม่ได้ฝน
     | { kind: "unclear"; reason: "multiple" | "faint" | "erased"; candidates: number[] }; // ให้ลูกค้ายืนยัน
 
-export type QuestionReading = { number: number; fills: number[]; reading: Reading };
+/** shift = ระยะที่จัดตำแหน่งเฉพาะที่เลื่อนวงของข้อนี้ไป (มม.) — ใช้ตัดภาพแถวให้ตรงกับที่อ่านจริง */
+export type QuestionReading = { number: number; fills: number[]; reading: Reading; shift?: Point };
 
-// เกณฑ์ตัดสิน (คิดเป็นสัดส่วนความเข้มเทียบกับวงเปล่าบนแผ่นเดียวกัน 0 = เหมือนวงเปล่า, 1 = ดำสนิท)
-// ค่าตั้งต้นของเฟส 0 — ปรับจากผลวัดรูปจริงก่อนเปิดใช้ (ดู _perf-tmp/paper-omr-harness.mjs)
+// เกณฑ์ตัดสิน — คิดเป็นสัดส่วนของ "รอยฝนปกติของแผ่นนี้" (1 = เข้มเท่ารอยฝนทั่วไปบนแผ่นเดียวกัน, 0 = เหมือนวงเปล่า)
+// เดิม (เฟส 0) เทียบกับ "ดำสนิท" — รอยจำลองกับจอ iPad เข้มเกือบดำจึงผ่าน แต่ดินสอ 2B บนกระดาษจริงถ่ายออกมาเป็นเทา
+// ได้แค่ 0.20-0.36 ของดำสนิท ตกเกณฑ์ "ฝน" ทุกข้อ (เจอจากรูปกระดาษจริงรอบแรก 2026-09-28) · เทียบกับรอยของแผ่นเอง
+// จึงใช้ได้ทั้งดินสอ/ปากกา/แสงมาก-น้อย — ดู markLevel ใน readSheet
 export const THRESHOLDS = {
-    filled: 0.38, // เกินนี้ = ฝน
-    blank: 0.14, // ต่ำกว่านี้ = ว่างแน่นอน
-    secondFilled: 0.24, // วงที่สองเข้มเกินนี้ ขณะที่วงแรกฝนชัด = ลบไม่หมด/ฝนสองวง → ให้ยืนยัน
+    filled: 0.55, // เข้มเกินครึ่งหนึ่งของรอยฝนปกติ = ฝน
+    blank: 0.3, // ต่ำกว่านี้ = ว่าง
+    secondFilled: 0.35, // วงที่สองเข้มเกินนี้ ขณะที่วงแรกฝนชัด = ลบไม่หมด/ฝนสองวง → ให้ยืนยัน
+    /** ค่าดิบ (เทียบดำสนิท) ที่ต่ำกว่านี้ = ฝุ่น/เงาจางๆ ไม่นับเลย — กันแผ่นที่แทบไม่ได้ฝนถูกขยายสัญญาณรบกวนจนเป็นคำตอบ */
+    noiseFloor: 0.07,
 };
+/**
+ * ครึ่งกว้างของกล่องที่ใช้หา "สีกระดาษ" รอบแต่ละวง (มม.) — เดิม 6 มม. (กล่อง 12 มม.) แต่ขอบเงามือที่พาดผ่านกล่อง
+ * ทำให้ได้สีกระดาษจากฝั่งที่สว่าง วงเปล่าในเงาเลยดูเหมือนฝน (รูปจริง 2026-09-28 ถามยืนยัน 11-16 ข้อตามแนวเงา)
+ * 3.2 มม. ยังครอบช่องว่างระหว่างวง (กระดาษแน่นอน >50% ของกล่อง) แต่แคบพอจะอยู่ฝั่งเดียวกับวงเกือบเสมอ
+ */
+const WHITE_BOX_MM = Number(globalThis.process?.env?.OMR_WHITE_BOX) || 3.2;
+/** รอยฝนปกติ: ค่ากลางของวงที่เข้มสุดในแต่ละข้อ (เฉพาะข้อที่มีรอยชัด) — ข้อที่มีรอยน้อยกว่านี้ใช้ค่าตั้งต้นแทน */
+const MARK_LEVEL = { minMark: 0.1, minQuestions: 5, fallback: 0.6, min: 0.18, max: 0.9 };
 
 /** ความเข้มเฉลี่ยในวงรัศมี r (พิกเซล) เทียบกับกระดาษขาวรอบๆ — 0 = ขาวเท่ากระดาษ, 1 = ดำสนิท */
 function darknessAt(rect: GrayImage, cx: number, cy: number, r: number, white: number): number {
@@ -328,22 +363,151 @@ function localWhite(rect: GrayImage, cx: number, cy: number, half: number): numb
     return 255;
 }
 
-export function readBubbles(rect: GrayImage, pxPerMm: number, slots: QuestionSlot[]): QuestionReading[] {
+// ── จัดตำแหน่งเฉพาะที่ (กระดาษไม่เรียบ) ────────────────────────────────────────────────────────────────
+//
+// การดึงภาพจาก 4 มุม (homography) ถูกต้องเฉพาะกระดาษที่เรียบสนิท — กระดาษจริงบนโต๊ะมักโค้ง (ขอบบนงอขึ้น)
+// เจอจริงจากรูปถ่ายกระดาษพิมพ์รอบแรก (2026-09-28): แถวล่างตรงเป๊ะ แต่แถวบนเลื่อนไป ~3 มม. = อ่านพลาดวงไปทั้งวง
+// ทุกข้อในแถวบนกลายเป็น "ไม่ได้ตอบ" (ผิดโดยไม่เตือน) · รูปจำลอง/จอ iPad เรียบสนิทจึงไม่เคยเห็นปัญหานี้
+//
+// วิธีแก้: แบ่งเป็นก้อน (1 คอลัมน์ × 5 แถว = 20 วง) แต่ละก้อนหาระยะเลื่อนที่ทำให้ "เส้นขอบวงที่พิมพ์ไว้" ตรงที่สุด
+// (วงแหวนมืดกว่ากระดาษรอบนอก — ใช้ได้ทั้งวงว่างและวงที่ฝน) ในกรอบ ±3 มม. แล้วบังคับให้ก้อนติดกันเลื่อนไปทางเดียวกัน
+// ⚠ กรอบค้นหาต้องไม่ถึงครึ่งระยะห่างระหว่างวง (6.7 มม. แนวนอน / 8 มม. แนวตั้ง) ไม่งั้นอาจไปตรงกับวงข้างๆ แทน
+//   = คำตอบเลื่อนไปทั้งแถว · กระดาษโค้งจนต้องเลื่อนถึงขอบกรอบ = ปฏิเสธให้ถ่ายใหม่ ไม่เดา
+export const ALIGN = { searchX: 3, searchY: 3.5, neighborTolerance: 1.5 };
+
+type BlockShift = { dx: number; dy: number };
+
+/** คะแนนความตรงของก้อนที่ระยะเลื่อน (dx,dy) พิกเซล = กระดาษรอบนอกวงสว่างกว่าเส้นขอบวงแค่ไหน (เฉลี่ยทุกวงในก้อน) */
+function ringScore(rect: GrayImage, centers: Point[], ring: Point[], outside: Point[], dx: number, dy: number): number {
+    let ringSum = 0;
+    let outSum = 0;
+    let n = 0;
+    const at = (x: number, y: number) => {
+        const xi = Math.round(x);
+        const yi = Math.round(y);
+        return xi < 0 || yi < 0 || xi >= rect.width || yi >= rect.height ? 255 : rect.data[yi * rect.width + xi];
+    };
+    for (const c of centers) {
+        for (const p of ring) ringSum += at(c.x + p.x + dx, c.y + p.y + dy);
+        for (const p of outside) outSum += at(c.x + p.x + dx, c.y + p.y + dy);
+        n++;
+    }
+    return (outSum / outside.length - ringSum / ring.length) / Math.max(1, n);
+}
+
+/** ระยะเลื่อนของแต่ละวง (มม.) + ปัญหา (null = จัดได้) — ก้อน = คอลัมน์ × กลุ่ม 5 แถวบนหน้าเดียว */
+export function alignSlots(rect: GrayImage, pxPerMm: number, slots: QuestionSlot[]): { shifts: Point[]; problem: string | null } {
+    const R = GRID.bubbleRadius * pxPerMm;
+    const circle = (radius: number, step: number) => Array.from({ length: Math.round(360 / step) }, (_, k) => ({ x: radius * Math.cos((k * step * Math.PI) / 180), y: radius * Math.sin((k * step * Math.PI) / 180) }));
+    const ring = [...circle(R * 0.93, 10), ...circle(R, 10)];
+    const outside = circle(R * 1.3, 15);
+    const groupsPerCol = GRID.rowsPerCol / GRID.groupEvery;
+    const keyOf = (i: number) => Math.floor(i / GRID.rowsPerCol) * groupsPerCol + Math.floor((i % GRID.rowsPerCol) / GRID.groupEvery);
+    const blocks = new Map<number, Point[]>();
+    slots.forEach((slot, i) => {
+        const list = blocks.get(keyOf(i)) ?? [];
+        for (const b of slot.bubbles) list.push({ x: b.x * pxPerMm, y: b.y * pxPerMm });
+        blocks.set(keyOf(i), list);
+    });
+
+    const sx = Math.round(ALIGN.searchX * pxPerMm);
+    const sy = Math.round(ALIGN.searchY * pxPerMm);
+    const best = new Map<number, BlockShift>();
+    for (const [key, centers] of blocks) {
+        // หยาบก่อน (ทีละ 2 พิกเซล) แล้วละเอียดรอบจุดที่ดีที่สุด
+        let top = { dx: 0, dy: 0, s: -Infinity };
+        for (let dy = -sy; dy <= sy; dy += 2)
+            for (let dx = -sx; dx <= sx; dx += 2) {
+                const s = ringScore(rect, centers, ring, outside, dx, dy);
+                if (s > top.s) top = { dx, dy, s };
+            }
+        const coarse = top;
+        for (let dy = coarse.dy - 2; dy <= coarse.dy + 2; dy++)
+            for (let dx = coarse.dx - 2; dx <= coarse.dx + 2; dx++) {
+                if (Math.abs(dx) > sx || Math.abs(dy) > sy) continue;
+                const s = ringScore(rect, centers, ring, outside, dx, dy);
+                if (s > top.s) top = { dx, dy, s };
+            }
+        best.set(key, { dx: top.dx, dy: top.dy });
+    }
+
+    // ก้อนติดกันต้องเลื่อนไปทางเดียวกัน (กระดาษโค้งเป็นเนื้อเดียว) — ก้อนที่ต่างจากเพื่อนบ้านเกินเกณฑ์ = ไปจับวงข้างๆ
+    // ใช้ค่ากลางของเพื่อนบ้านแทน
+    const tol = ALIGN.neighborTolerance * pxPerMm;
+    const cols = GRID.cols;
+    const final = new Map<number, BlockShift>();
+    let outliers = 0;
+    for (const [key, v] of best) {
+        const col = Math.floor(key / groupsPerCol);
+        const g = key % groupsPerCol;
+        const neighbors = [
+            [col - 1, g],
+            [col + 1, g],
+            [col, g - 1],
+            [col, g + 1],
+        ]
+            .filter(([c, gg]) => c >= 0 && c < cols && gg >= 0 && gg < groupsPerCol)
+            .map(([c, gg]) => best.get(c * groupsPerCol + gg))
+            .filter((n): n is BlockShift => !!n);
+        if (!neighbors.length) {
+            final.set(key, v);
+            continue;
+        }
+        const med = (a: number[]) => [...a].sort((p, q) => p - q)[Math.floor((a.length - 1) / 2)];
+        const m = { dx: med(neighbors.map((n) => n.dx)), dy: med(neighbors.map((n) => n.dy)) };
+        if (Math.abs(v.dx - m.dx) > tol || Math.abs(v.dy - m.dy) > tol) {
+            outliers++;
+            final.set(key, m);
+        } else final.set(key, v);
+    }
+
+    let problem: string | null = null;
+    const edge = (d: number, limit: number) => Math.abs(d) >= limit - 1;
+    if (outliers > blocks.size / 4) problem = `จัดตำแหน่งไม่ลงตัว ${outliers}/${blocks.size} ก้อน`;
+    else if ([...final.values()].some((v) => edge(v.dx, sx) || edge(v.dy, sy))) problem = "กระดาษโค้งจนเลื่อนเกินกรอบค้นหา";
+
+    const shifts = slots.map((_, i) => {
+        const v = final.get(keyOf(i)) ?? { dx: 0, dy: 0 };
+        return { x: v.dx / pxPerMm, y: v.dy / pxPerMm };
+    });
+    return { shifts, problem };
+}
+
+/**
+ * อ่านทุกวงของหน้า — จัดตำแหน่งเฉพาะที่ก่อน (alignSlots) · problem ไม่ใช่ null = กระดาษโค้ง/ยับเกินจัดได้ ต้องให้ถ่ายใหม่
+ * (ผู้เรียกต้องปฏิเสธทั้งแผ่น ห้ามใช้ readings ต่อ)
+ */
+export function readSheet(rect: GrayImage, pxPerMm: number, slots: QuestionSlot[]): { readings: QuestionReading[]; problem: string | null } {
+    const { shifts, problem } = alignSlots(rect, pxPerMm, slots);
     const r = GRID.bubbleRadius * 0.72 * pxPerMm; // ดูเฉพาะด้านในวง ไม่เอาเส้นขอบวงที่พิมพ์มา
-    const raw = slots.map((slot) =>
+    const raw = slots.map((slot, i) =>
         slot.bubbles.map((b) => {
-            const white = localWhite(rect, b.x * pxPerMm, b.y * pxPerMm, 6 * pxPerMm);
-            return darknessAt(rect, b.x * pxPerMm, b.y * pxPerMm, r, white);
+            const x = (b.x + shifts[i].x) * pxPerMm;
+            const y = (b.y + shifts[i].y) * pxPerMm;
+            return darknessAt(rect, x, y, r, localWhite(rect, x, y, WHITE_BOX_MM * pxPerMm));
         })
     );
     // "วงเปล่า" ของแผ่นนี้ = ค่ากลางของทุกวง (วงส่วนใหญ่ไม่ได้ฝน) — ตัวอักษร ก ข ค ง ในวงและหมึกพิมพ์แต่ละเครื่อง
     // ทำให้วงเปล่าไม่ได้เป็น 0 จึงวัดเทียบกับค่านี้แทนค่าตายตัว
     const all = raw.flat().sort((a, b) => a - b);
     const empty = all.length ? all[Math.floor(all.length * 0.5)] : 0;
-    return slots.map((slot, i) => {
-        const fills = raw[i].map((d) => Math.max(0, (d - empty) / Math.max(0.2, 1 - empty)));
-        return { number: slot.number, fills, reading: decide(fills) };
+    const absolute = raw.map((row) => row.map((d) => Math.max(0, (d - empty) / Math.max(0.2, 1 - empty))));
+    // ความเข้มของรอยฝนปกติบนแผ่นนี้ — ตัวหารของเกณฑ์ทั้งหมด (ดู THRESHOLDS)
+    const marks = absolute.map((row) => Math.max(0, ...row)).filter((v) => v >= MARK_LEVEL.minMark).sort((a, b) => a - b);
+    const level =
+        marks.length >= MARK_LEVEL.minQuestions
+            ? Math.min(MARK_LEVEL.max, Math.max(MARK_LEVEL.min, marks[Math.floor(marks.length / 2)]))
+            : MARK_LEVEL.fallback;
+    const readings = slots.map((slot, i) => {
+        const fills = absolute[i].map((f) => (f < THRESHOLDS.noiseFloor ? 0 : f / level));
+        return { number: slot.number, fills, reading: decide(fills), shift: shifts[i] };
     });
+    return { readings, problem };
+}
+
+/** เหมือน readSheet แต่คืนแค่ผลอ่าน — สำหรับสคริปต์วัดผล (หน้าเว็บต้องใช้ readSheet เพื่อรู้ว่าต้องปฏิเสธแผ่นไหม) */
+export function readBubbles(rect: GrayImage, pxPerMm: number, slots: QuestionSlot[]): QuestionReading[] {
+    return readSheet(rect, pxPerMm, slots).readings;
 }
 
 export function decide(fills: number[]): Reading {
@@ -368,7 +532,9 @@ export function decide(fills: number[]): Reading {
 /** เกณฑ์ตรวจตำแหน่ง (สัดส่วนเทียบความสว่างที่กระดาษควรเป็น) — ปรับจากผลวัด ดู _perf-tmp/paper-omr-harness.mjs */
 // ring 0.6 (เดิม 0.72): รูปถ่ายจริงที่มุมภาพมืดกว่ากลางภาพ (vignette) ติดเกณฑ์เดิม — วัดแล้วผ่านตั้งแต่ 0.65 ลงมา
 // ส่วนตัวล่อบนพื้นหลังยังโดนปฏิเสธครบแม้ลดถึง 0.5 (ดู _perf-tmp/paper-sweep.mjs)
-export const REGISTRATION = { inner: 0.45, ring: 0.6, margin: 0.72 };
+// inner 0.65 (เดิม 0.45): สี่เหลี่ยมมุมที่พิมพ์จริงออกมาเป็นเทาเข้ม ไม่ดำสนิท — วัดจากกระดาษพิมพ์จริง 0.37-0.54 ของกระดาษ
+// (มุมล่างซ้ายซีดสุดทุกรูป = หมึกเครื่องพิมพ์ไม่สม่ำเสมอ) จอ/รูปจำลองดำสนิทจึงไม่เคยเห็นปัญหานี้ (2026-09-28)
+export const REGISTRATION = { inner: 0.65, ring: 0.6, margin: 0.72, shadowEdge: 0.88 };
 
 /** null = ตำแหน่งถูก · ข้อความ = ติดที่ข้อไหน (ใช้ไล่สาเหตุในหน้าแล็บ/สคริปต์ ลูกค้าเห็นแค่ "ให้ถ่ายใหม่") */
 export function registrationProblem(rect: GrayImage, pxPerMm: number): string | null {
@@ -410,16 +576,24 @@ export function registrationProblem(rect: GrayImage, pxPerMm: number): string | 
         }
     }
     // ขอบกระดาษระหว่างมุม (ห่างขอบ 4-6 มม.) ต้องขาวตลอดแนว ตรวจเป็นช่วงๆ — ถ้าดึงภาพผิด บางช่วงจะมาจากพื้นหลัง
+    // ผ่านถ้าขาวเทียบระนาบของทั้งแผ่น **หรือ** สว่างพอๆ กับกระดาษที่ลึกเข้าไปอีก 4 มม. (ช่วงเดียวกัน)
+    // เงามือขอบคมทับขอบกระดาษ (เจอจากรูปจริง 2026-09-28) ทำให้ระนาบคาดผิด แต่เงาทำให้สองแถบมืดเท่ากัน จึงยังผ่าน ·
+    // ส่วนดึงภาพผิดจนแถบขอบไปอยู่บนพื้นหลัง แถบข้างในยังเป็นกระดาษที่สว่างกว่า จึงยังโดนปฏิเสธ
+    // (และมีการจัดตำแหน่งเฉพาะที่ใน readSheet ตรวจซ้ำอีกชั้น — วงที่พิมพ์ไว้ต้องหาเจอในระยะใกล้ๆ)
+    const edgeOk = (x0: number, y0: number, x1: number, y1: number, ix0: number, iy0: number, ix1: number, iy1: number) =>
+        whiteEnough(x0, y0, x1, y1, REGISTRATION.margin) || meanIn(x0, y0, x1, y1) >= meanIn(ix0, iy0, ix1, iy1) * REGISTRATION.shadowEdge;
     for (let t = 0; t < 6; t++) {
         const x0 = 25 + ((PAPER.width - 50) * t) / 6;
         const x1 = 25 + ((PAPER.width - 50) * (t + 1)) / 6;
         const y0 = 25 + ((PAPER.height - 50) * t) / 6;
         const y1 = 25 + ((PAPER.height - 50) * (t + 1)) / 6;
+        const W = PAPER.width;
+        const Hh = PAPER.height;
         if (
-            !whiteEnough(x0, 4, x1, 6, REGISTRATION.margin) ||
-            !whiteEnough(x0, PAPER.height - 6, x1, PAPER.height - 4, REGISTRATION.margin) ||
-            !whiteEnough(4, y0, 6, y1, REGISTRATION.margin) ||
-            !whiteEnough(PAPER.width - 6, y0, PAPER.width - 4, y1, REGISTRATION.margin)
+            !edgeOk(x0, 4, x1, 6, x0, 8, x1, 10) ||
+            !edgeOk(x0, Hh - 6, x1, Hh - 4, x0, Hh - 10, x1, Hh - 8) ||
+            !edgeOk(4, y0, 6, y1, 8, y0, 10, y1) ||
+            !edgeOk(W - 6, y0, W - 4, y1, W - 10, y0, W - 8, y1)
         ) {
             return `ขอบกระดาษช่วงที่ ${t + 1}/6 ไม่ขาวพอ`;
         }

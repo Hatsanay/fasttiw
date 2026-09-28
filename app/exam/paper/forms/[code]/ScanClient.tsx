@@ -11,7 +11,8 @@ import Button from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
 import { CHOICE_LABELS, QUESTIONS_PER_PAGE, paginate } from "@/lib/paper/layout";
 import { grayToRgba, type GrayImage, type QuestionReading } from "@/lib/paper/omr";
-import { cropQuestionRow, grayToJpeg, locatePage, readPage, type LocatedPage } from "@/lib/paper/scan";
+import { CURLED_PAPER_REASON, cropQuestionRow, grayToJpeg, locatePage, readPage, type LocatedPage } from "@/lib/paper/scan";
+import type { Point } from "@/lib/paper/layout";
 
 // ตรวจกระดาษคำตอบ (ระบบสอบกระดาษ เฟส 2 — CLAUDE.md ข้อ 6.9)
 // ถ่าย/เลือกรูป → อ่านในเครื่อง (lib/paper/scan.ts) → ลูกค้ายืนยันข้อที่อ่านไม่ชัด (+ แก้ข้อไหนก็ได้) → ส่งตรวจ → หน้าเฉลย
@@ -32,7 +33,7 @@ export type PaperFormInfo = {
 type PageScan = { rect: GrayImage; readings: QuestionReading[]; blob: Blob; preview: string };
 type Failure = { name: string; reason: string };
 /** คำตอบสุดท้ายของข้อ: ดัชนีตัวเลือก / null = ไม่ได้ตอบ / undefined = ยังต้องยืนยัน */
-type QuestionState = { number: number; reading: QuestionReading["reading"]; answer: number | null | undefined; edited: boolean };
+type QuestionState = { number: number; reading: QuestionReading["reading"]; answer: number | null | undefined; edited: boolean; shift?: Point };
 
 const REASON_TEXT = { multiple: "ฝนมากกว่า 1 วง", faint: "ฝนจางเกินไป", erased: "มีรอยลบไม่หมด" } as const;
 
@@ -50,16 +51,16 @@ function stateOf(reading: QuestionReading["reading"], override: number | null | 
 }
 
 /** ภาพแถวของข้อหนึ่งจากกระดาษจริง — ให้ลูกค้าเห็นเองว่าฝนไว้แบบไหน ก่อนตัดสินใจ */
-function RowImage({ rect, counts, number }: { rect: GrayImage; counts: number[]; number: number }) {
+function RowImage({ rect, counts, number, shift }: { rect: GrayImage; counts: number[]; number: number; shift?: Point }) {
     const ref = useRef<HTMLCanvasElement>(null);
     useEffect(() => {
         const canvas = ref.current;
-        const crop = cropQuestionRow(rect, counts, number);
+        const crop = cropQuestionRow(rect, counts, number, shift);
         if (!canvas || !crop) return;
         canvas.width = crop.width;
         canvas.height = crop.height;
         canvas.getContext("2d")!.putImageData(new ImageData(grayToRgba(crop), crop.width, crop.height), 0, 0);
-    }, [rect, counts, number]);
+    }, [rect, counts, number, shift]);
     return <canvas ref={ref} className="h-auto w-full max-w-72 rounded-lg border border-slate-200 bg-white" aria-label={`ภาพข้อ ${number} บนกระดาษ`} />;
 }
 
@@ -87,7 +88,7 @@ function QuestionPicker({
                     <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-700">{REASON_TEXT[state.reading.reason]}</span>
                 )}
             </div>
-            <RowImage rect={rect} counts={counts} number={number} />
+            <RowImage rect={rect} counts={counts} number={number} shift={state.shift} />
             <div className="mt-3 flex flex-wrap gap-1.5">
                 {Array.from({ length: choiceCount }, (_, c) => (
                     <button
@@ -146,8 +147,10 @@ export default function ScanClient({ form }: { form: PaperFormInfo }) {
     /** รับหน้าที่อ่านได้แล้ว (จากไฟล์หรือกล้องสด) — ตรวจว่าเป็นของใบนี้ อ่านวง แล้วเก็บ · ใช้ทั้งสองทางจึงมีกติกาชุดเดียว */
     async function acceptPage({ id, rect }: Extract<LocatedPage, { ok: true }>): Promise<CaptureOutcome> {
         if (id.code !== form.code) return { ok: false, reason: `เป็นกระดาษคำตอบของใบสอบ ${id.code} ไม่ใช่ใบนี้ (${form.code})` };
-        const readings = id.pages === form.pages ? readPage(rect, form.choice_counts, id.page) : null;
-        if (!readings) return { ok: false, reason: "จำนวนหน้าไม่ตรงกับใบสอบนี้ — ใช้กระดาษคำตอบที่ดาวน์โหลดจากใบสอบนี้เท่านั้น" };
+        const read = id.pages === form.pages ? readPage(rect, form.choice_counts, id.page) : null;
+        if (!read) return { ok: false, reason: "จำนวนหน้าไม่ตรงกับใบสอบนี้ — ใช้กระดาษคำตอบที่ดาวน์โหลดจากใบสอบนี้เท่านั้น" };
+        if (read.problem) return { ok: false, reason: CURLED_PAPER_REASON };
+        const readings = read.readings;
         const blob = await grayToJpeg(rect);
         const scan: PageScan = { rect, readings, blob, preview: URL.createObjectURL(blob) };
         setPages((prev) => {
@@ -200,7 +203,7 @@ export default function ScanClient({ form }: { form: PaperFormInfo }) {
         for (const scan of Object.values(pages)) {
             for (const r of scan.readings) {
                 const has = Object.prototype.hasOwnProperty.call(overrides, r.number);
-                out.push({ number: r.number, reading: r.reading, answer: stateOf(r.reading, overrides[r.number], has), edited: has });
+                out.push({ number: r.number, reading: r.reading, answer: stateOf(r.reading, overrides[r.number], has), edited: has, shift: r.shift });
             }
         }
         return out.sort((a, b) => a.number - b.number);
