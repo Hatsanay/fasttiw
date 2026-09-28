@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Camera, Check, Loader2, X } from "lucide-react";
+import { Camera, Check, Flashlight, FlashlightOff, Loader2, X } from "lucide-react";
 import { cn } from "@/lib/cn";
-import type { Point } from "@/lib/paper/layout";
-import { findFiducials } from "@/lib/paper/omr";
+import { FIDUCIALS, type Point } from "@/lib/paper/layout";
+import { SHADOW_SCORE, findFiducials, homography, lightingScore, rectify } from "@/lib/paper/omr";
 import { grayFromVideo, locateGray, type LocatedPage } from "@/lib/paper/scan";
 
 // สแกนอัตโนมัติด้วยกล้องสด (ระบบสอบกระดาษ — CLAUDE.md ข้อ 6.9)
@@ -23,6 +23,8 @@ const STABLE_FRAMES = 4;
 const MAX_SHIFT = 0.02;
 /** กรอบสี่เหลี่ยมมุมต้องกินพื้นที่ภาพอย่างน้อยเท่านี้ — ไกลกว่านี้วงคำตอบเล็กเกินไปจะอ่านได้ไม่ดี */
 const MIN_COVER = 0.2;
+/** มีเงาค้างนานเกินนี้ (หลังถือนิ่งแล้ว) = ถ่ายให้เลย — ตัวอ่านรับมือเงาได้อย่างปลอดภัย (ถามข้อที่ไม่ชัด) ลูกค้าต้องไม่ติดค้าง */
+const SHADOW_GRACE_MS = 4000;
 
 type Hint = { tone: "info" | "warn" | "ok"; text: string };
 
@@ -89,6 +91,21 @@ export default function AutoCamera({
     const [flash, setFlash] = useState(false);
     const [sessionPages, setSessionPages] = useState<number[]>([]);
     const shootNowRef = useRef(false);
+    // ไฟฉาย — มีเฉพาะเครื่องที่เบราว์เซอร์ให้สั่งได้ (Android Chrome) · ช่วยลบเงามือ/เงามือถือบนกระดาษ
+    const trackRef = useRef<MediaStreamTrack | null>(null);
+    const [torch, setTorch] = useState<{ available: boolean; on: boolean }>({ available: false, on: false });
+
+    async function toggleTorch() {
+        const track = trackRef.current;
+        if (!track) return;
+        const next = !torch.on;
+        try {
+            await track.applyConstraints({ advanced: [{ torch: next } as MediaTrackConstraintSet] });
+            setTorch({ available: true, on: next });
+        } catch {
+            setTorch({ available: false, on: false });
+        }
+    }
 
     // ค่าล่าสุดของ props ให้ลูปกล้องอ่าน — ไม่ใส่เป็น dependency ไม่งั้นกล้องปิด-เปิดใหม่ทุกครั้งที่หน้าหลักเรนเดอร์
     const latest = useRef({ onCapture, onClose, scannedPages, totalPages });
@@ -116,11 +133,13 @@ export default function AutoCamera({
         let prev: Point[] | null = null;
         let steadyCount = 0;
         let pausedUntil = 0;
+        let shadowSince: number | null = null;
 
         const pause = (ms: number) => {
             pausedUntil = Date.now() + ms;
             prev = null;
             steadyCount = 0;
+            shadowSince = null;
             drawQuad(overlay, video, null, false);
             setFound(false);
         };
@@ -181,6 +200,7 @@ export default function AutoCamera({
                     if (!result.ok) {
                         prev = null;
                         steadyCount = 0;
+                        shadowSince = null;
                         drawQuad(overlay, video, null, false);
                         setFound(false);
                         setHint({ tone: "info", text: "เล็งให้เห็นกระดาษทั้งแผ่น — สี่เหลี่ยมดำครบ 4 มุม" });
@@ -197,9 +217,23 @@ export default function AutoCamera({
                             drawQuad(overlay, video, corners, false);
                             setHint({ tone: "warn", text: "ขยับกล้องเข้าใกล้อีกนิด ให้กระดาษเต็มจอ" });
                         } else {
-                            drawQuad(overlay, video, corners, steadyCount >= 2);
-                            setHint({ tone: "info", text: "ถือนิ่งๆ สักครู่..." });
-                            if (steadyCount >= STABLE_FRAMES) await capture();
+                            // เงาทับกระดาษ? ดึงภาพตรงหยาบๆ (2 px/มม. จากภาพย่อ ~5 ms) แล้ววัดความสม่ำเสมอของแสง
+                            // วัดเฉพาะตอนเริ่มนิ่งแล้ว ช่วงมือยังขยับไม่ต้องเสียเวลาคำนวณ
+                            let shadow = false;
+                            if (steadyCount >= 2) {
+                                const low = rectify(small, homography(FIDUCIALS, result.corners), 2);
+                                shadow = lightingScore(low, 2) < SHADOW_SCORE;
+                            }
+                            if (shadow) shadowSince ??= Date.now();
+                            else shadowSince = null;
+                            const waitShadow = shadowSince !== null && Date.now() - shadowSince < SHADOW_GRACE_MS;
+                            drawQuad(overlay, video, corners, steadyCount >= 2 && !waitShadow);
+                            setHint(
+                                waitShadow
+                                    ? { tone: "warn", text: "มีเงาบังกระดาษ — ยกมือออก หรือเอียงมือถือเล็กน้อยให้เงาหลุด" }
+                                    : { tone: "info", text: "ถือนิ่งๆ สักครู่..." }
+                            );
+                            if (steadyCount >= STABLE_FRAMES && !waitShadow) await capture();
                         }
                     }
                 }
@@ -224,6 +258,10 @@ export default function AutoCamera({
             }
             video.srcObject = stream;
             await video.play().catch(() => {});
+            const track = stream.getVideoTracks()[0];
+            trackRef.current = track ?? null;
+            const caps = (track?.getCapabilities?.() ?? {}) as { torch?: boolean };
+            if (caps.torch) setTorch({ available: true, on: false });
             setHint({ tone: "info", text: "เล็งให้เห็นกระดาษทั้งแผ่น — สี่เหลี่ยมดำครบ 4 มุม" });
             tick();
         })();
@@ -263,6 +301,20 @@ export default function AutoCamera({
                         <X size={20} />
                     </button>
                     <p className="flex-1 text-sm font-medium">สแกนอัตโนมัติ</p>
+                    {torch.available && (
+                        <button
+                            type="button"
+                            onClick={toggleTorch}
+                            aria-pressed={torch.on}
+                            aria-label={torch.on ? "ปิดไฟฉาย" : "เปิดไฟฉาย"}
+                            className={cn(
+                                "flex h-10 w-10 items-center justify-center rounded-full backdrop-blur",
+                                torch.on ? "bg-yellow-300 text-slate-900" : "bg-white/15 hover:bg-white/25"
+                            )}
+                        >
+                            {torch.on ? <Flashlight size={18} /> : <FlashlightOff size={18} />}
+                        </button>
+                    )}
                     <div className="flex gap-1">
                         {allPages.map((p) => {
                             const done = sessionPages.includes(p) || scannedPages.includes(p);

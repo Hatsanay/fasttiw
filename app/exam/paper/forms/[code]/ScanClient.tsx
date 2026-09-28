@@ -10,7 +10,7 @@ import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
 import { CHOICE_LABELS, QUESTIONS_PER_PAGE, paginate } from "@/lib/paper/layout";
-import { grayToRgba, type GrayImage, type QuestionReading } from "@/lib/paper/omr";
+import { RECTIFY_PX_PER_MM, SHADOW_SCORE, grayToRgba, lightingScore, type GrayImage, type QuestionReading } from "@/lib/paper/omr";
 import { CURLED_PAPER_REASON, cropQuestionRow, grayToJpeg, locatePage, readPage, type LocatedPage } from "@/lib/paper/scan";
 import type { Point } from "@/lib/paper/layout";
 
@@ -30,7 +30,8 @@ export type PaperFormInfo = {
     scanned_pages: number[];
 };
 
-type PageScan = { rect: GrayImage; readings: QuestionReading[]; blob: Blob; preview: string };
+/** shadow = รูปนี้มีเงาทับกระดาษ (omr.lightingScore) — ใช้บอกลูกค้าว่าถ่ายใหม่แล้วจะต้องยืนยันน้อยลง */
+type PageScan = { rect: GrayImage; readings: QuestionReading[]; blob: Blob; preview: string; shadow: boolean };
 type Failure = { name: string; reason: string };
 /** คำตอบสุดท้ายของข้อ: ดัชนีตัวเลือก / null = ไม่ได้ตอบ / undefined = ยังต้องยืนยัน */
 type QuestionState = { number: number; reading: QuestionReading["reading"]; answer: number | null | undefined; edited: boolean; shift?: Point };
@@ -38,7 +39,7 @@ type QuestionState = { number: number; reading: QuestionReading["reading"]; answ
 const REASON_TEXT = { multiple: "ฝนมากกว่า 1 วง", faint: "ฝนจางเกินไป", erased: "มีรอยลบไม่หมด" } as const;
 
 const TIPS = [
-    "วางกระดาษบนพื้นเรียบสีเข้ม แสงสว่างพอ ไม่มีเงามือหรือเงาโทรศัพท์บัง",
+    "วางกระดาษให้เรียบบนพื้นสีเข้ม แสงสว่างพอ ไม่มีเงามือหรือเงาโทรศัพท์ทับ (มีเงา: ยกมือถือสูงขึ้นหรือเอียงเล็กน้อย / เปิดไฟฉาย)",
     "ให้เห็นสี่เหลี่ยมดำครบทั้ง 4 มุม และ QR มุมขวาบนชัด",
     "ถ่ายตรงจากด้านบน กระดาษ 1 หน้าต่อ 1 รูป (ชุดที่มีหลายหน้า ถ่ายทีละหน้า เลือกพร้อมกันหลายรูปได้)",
 ];
@@ -152,7 +153,7 @@ export default function ScanClient({ form }: { form: PaperFormInfo }) {
         if (read.problem) return { ok: false, reason: CURLED_PAPER_REASON };
         const readings = read.readings;
         const blob = await grayToJpeg(rect);
-        const scan: PageScan = { rect, readings, blob, preview: URL.createObjectURL(blob) };
+        const scan: PageScan = { rect, readings, blob, preview: URL.createObjectURL(blob), shadow: lightingScore(rect, RECTIFY_PX_PER_MM) < SHADOW_SCORE };
         setPages((prev) => {
             if (prev[id.page]) URL.revokeObjectURL(prev[id.page].preview);
             return { ...prev, [id.page]: scan };
@@ -365,7 +366,11 @@ export default function ScanClient({ form }: { form: PaperFormInfo }) {
                                         {pageStates.filter((s) => s.answer === null).length}
                                         {needs > 0 && <span className="whitespace-nowrap font-medium text-amber-700"> · ต้องยืนยัน {needs}</span>}
                                     </p>
-                                ) : (
+                                ) : null}
+                                {scan?.shadow && needs > 0 ? (
+                                    <p className="mt-0.5 text-xs text-amber-700">รูปนี้มีเงาทับบางส่วน — ถ่ายใหม่แบบไม่มีเงา จะต้องยืนยันน้อยลง</p>
+                                ) : null}
+                                {scan ? null : (
                                     <p className="mt-0.5 text-xs text-slate-400">ยังไม่ได้สแกน</p>
                                 )}
                             </div>

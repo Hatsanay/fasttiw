@@ -138,8 +138,11 @@ export function findFiducials(img: GrayImage): FiducialResult {
     if (squares.length < 4) return { ok: false, reason: "หาสี่เหลี่ยมดำที่มุมกระดาษไม่ครบ 4 มุม — ถ่ายให้เห็นกระดาษทั้งแผ่น", debug };
 
     // สี่เหลี่ยมมุมเป็นสี่เหลี่ยมทึบที่ใหญ่ที่สุดบนกระดาษ — ตัดของเล็กๆ (จุดกลาง QR ฯลฯ) ออกก่อน
+    // 0.2 (เดิม 0.35): ถ่ายเอียงมาก มุมไกลกล้องดูเล็กกว่ามุมใกล้มาก — รูปจริง 2026-09-28 มุมไกล 265 vs มุมใกล้ 771
+    // (0.34) โดนตัดทิ้งจนหาแผ่นไม่เจอเฉพาะบางขนาดภาพ · ของที่หลุดเข้ามาเพิ่ม (วงที่ฝน) ถูกกรองด้วยรูปทรงชุด 4 มุม +
+    // ตรวจตำแหน่ง + จัดตำแหน่งเฉพาะที่ อยู่แล้ว
     const largest = Math.max(...squares.map((s) => s.area));
-    const big = squares.filter((s) => s.area >= largest * 0.35).sort((a, b) => b.area - a.area).slice(0, 10);
+    const big = squares.filter((s) => s.area >= largest * 0.2).sort((a, b) => b.area - a.area).slice(0, 10);
     if (big.length < 4) return { ok: false, reason: "หาสี่เหลี่ยมดำที่มุมกระดาษไม่ครบ 4 มุม — ถ่ายให้เห็นกระดาษทั้งแผ่น", debug };
 
     // เดิมหยิบ "ตัวที่อยู่สุดมุมภาพ" ทีละมุม — พังเมื่อมีของดำเหลี่ยมๆ นอกกระดาษ (เจอจริง: ไอคอนบน taskbar ในภาพหน้าจอ
@@ -602,6 +605,30 @@ export function registrationProblem(rect: GrayImage, pxPerMm: number): string | 
 }
 
 /** ระนาบความสว่างของกระดาษ z = a + b·x + c·y (x, y เป็นมม.) — fit จากความขาวของกล่องกลางแผ่น 5 × 7 กล่อง */
+/**
+ * แสงบนกระดาษสม่ำเสมอแค่ไหน (1 = สม่ำเสมอ) — จุดที่มืดที่สุดเทียบกับระนาบความสว่างของทั้งแผ่น
+ * แสงไล่ระดับเรียบๆ (โคมอยู่ด้านข้าง) เข้ากับระนาบได้ ค่ายังสูง และตัวอ่านรับมือได้อยู่แล้ว
+ * **เงามือ/เงามือถือ** เป็นหย่อมมืดขอบคม ไม่เข้ากับระนาบ ค่าตกลงชัด — กล้องสดใช้เตือนให้ขยับก่อนถ่าย (AutoCamera)
+ */
+/** lightingScore ต่ำกว่านี้ = มีเงามือ/เงามือถือทับ — วัดจากรูปจริง 2026-09-28: ไม่มีเงา 0.93-0.94 · มีเงามือ 0.70-0.74 ·
+ * แสงไล่ระดับเรียบ (รูปจำลองมืดลง 45%) 0.98-1.00 · ใช้ทั้งกล้องสด (รอให้เงาหลุดก่อนถ่าย) และหน้าตรวจ (บอกว่าถ่ายใหม่จะดีกว่า) */
+export const SHADOW_SCORE = 0.85;
+
+export function lightingScore(rect: GrayImage, pxPerMm: number): number {
+    const plane = paperPlane(rect, pxPerMm);
+    let worst = 1;
+    for (let i = 0; i < 7; i++) {
+        for (let j = 0; j < 9; j++) {
+            const x = 22 + i * 27.7;
+            const y = 30 + j * 29.5;
+            const expected = plane[0] + plane[1] * x + plane[2] * y;
+            if (expected <= 0) continue;
+            worst = Math.min(worst, localWhite(rect, x * pxPerMm, y * pxPerMm, 4 * pxPerMm) / expected);
+        }
+    }
+    return worst;
+}
+
 function paperPlane(rect: GrayImage, pxPerMm: number): [number, number, number] {
     const pts: [number, number, number][] = [];
     for (let i = 0; i < 5; i++) {
