@@ -219,12 +219,18 @@ function SheetPage({
     page,
     pages,
     layout,
+    holderName,
+    variant,
 }: {
     productName: string;
     code: string;
     page: number;
     pages: number;
     layout: AnswerSheetPage;
+    /** กลุ่มสอบกระดาษ: พิมพ์ชื่อเจ้าของใบลงช่องชื่อให้เลย (แจกกระดาษถูกคน) */
+    holderName?: string | null;
+    /** กลุ่มสอบกระดาษแบบแบ่งชุด: ชุด A-D — ต้องตรงกับชุดข้อสอบที่แจก */
+    variant?: string | null;
 }) {
     const slots = pageSlots(layout.choiceCounts, layout.firstNumber);
     const r = GRID.bubbleRadius;
@@ -261,10 +267,21 @@ function SheetPage({
             <Pill x={86} y={35} w={26}>
                 {`ข้อ ${layout.firstNumber}–${lastNumber}`}
             </Pill>
+            {variant && (
+                <Pill x={114} y={35} w={18} strong>
+                    {`ชุด ${variant}`}
+                </Pill>
+            )}
 
             {/* ช่องเขียนมือ (ระบบไม่อ่าน) — ป้ายเล็กมุมบน + เส้นประให้เขียนทับ ให้เห็นทันทีว่าเขียนตรงไหน
-                (เดิมมีแค่ป้ายในกล่องว่าง คนดูไม่ออกว่าต้องเขียนในกล่องหรือข้างหลังป้าย) · เวลาเริ่ม-เสร็จไว้ให้ลูกค้าจับเวลาเอง */}
-            <WriteField x={22} w={68} label="ชื่อ-นามสกุล" parts={[62]} />
+                (เดิมมีแค่ป้ายในกล่องว่าง คนดูไม่ออกว่าต้องเขียนในกล่องหรือข้างหลังป้าย) · เวลาเริ่ม-เสร็จไว้ให้ลูกค้าจับเวลาเอง
+                ใบของกลุ่มพิมพ์ชื่อให้เลย (ระบบรู้อยู่แล้วว่าใบนี้ของใครจาก QR — ชื่อมีไว้ให้คนแจกกระดาษ) */}
+            <WriteField x={22} w={68} label="ชื่อ-นามสกุล" parts={holderName ? [] : [62]} />
+            {holderName && (
+                <Label x={25} y={45.4} width={63} size={10} bold>
+                    {oneLine(holderName, 34)}
+                </Label>
+            )}
             <WriteField x={92} w={34} label="วันที่สอบ (วัน / เดือน / ปี)" parts={[7, "/", 7, "/", 9]} />
             <WriteField x={128} w={32} label="เวลาสอบ (เริ่ม – เสร็จ)" parts={[4, ":", 4, "–", 4, ":", 4, "น."]} />
 
@@ -402,6 +419,30 @@ export function AnswerSheetDocument({
                 <SheetPage key={i} productName={productName} code={code} page={i + 1} pages={pages.length} layout={layout} />
             ))}
             {testMarks && <TestPatternPages code={code} marks={testMarks} />}
+        </Document>
+    );
+}
+
+export type GroupAnswerSheet = { code: string; holderName: string; variant: string | null; pages: AnswerSheetPage[] };
+
+/** กระดาษคำตอบของทั้งกลุ่มในไฟล์เดียว (ใบละคน เรียงตามรายชื่อ) — พิมพ์ทีเดียวแล้วแจกตามชื่อบนกระดาษ */
+export function GroupAnswerSheetDocument({ productName, title, sheets }: { productName: string; title: string; sheets: GroupAnswerSheet[] }) {
+    return (
+        <Document title={`กระดาษคำตอบ ${title}`} author="Fasttiw">
+            {sheets.flatMap((s) =>
+                s.pages.map((layout, i) => (
+                    <SheetPage
+                        key={`${s.code}-${i}`}
+                        productName={productName}
+                        code={s.code}
+                        page={i + 1}
+                        pages={s.pages.length}
+                        layout={layout}
+                        holderName={s.holderName}
+                        variant={s.variant}
+                    />
+                ))
+            )}
         </Document>
     );
 }

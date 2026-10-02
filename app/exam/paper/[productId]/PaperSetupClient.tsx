@@ -3,11 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Camera, Check, ChevronRight, Download, FileText, Loader2, Printer, ScanLine, Shuffle, Sparkles, SquareCheckBig } from "lucide-react";
+import { Camera, Check, ChevronRight, FileText, Loader2, Printer, ScanLine, Shuffle, Sparkles, SquareCheckBig } from "lucide-react";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
 import { QUESTIONS_PER_PAGE } from "@/lib/paper/layout";
+import DownloadButton from "../DownloadButton";
 
 export type PaperForm = {
     code: string;
@@ -32,37 +33,6 @@ const STEPS = [
 
 function formatDate(value: string) {
     return new Date(value).toLocaleString("th-TH", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Bangkok" });
-}
-
-/** ปุ่มดาวน์โหลด PDF — สร้างไฟล์ใช้เวลาหลายวินาที (ชุดใหญ่มีรูป) จึงต้องบอกว่ากำลังสร้าง ไม่งั้นลูกค้ากดซ้ำ */
-function DownloadButton({ href, fileName, label, primary }: { href: string; fileName: string; label: string; primary?: boolean }) {
-    const [busy, setBusy] = useState(false);
-    async function download() {
-        setBusy(true);
-        try {
-            const res = await fetch(href);
-            if (!res.ok) {
-                const body = await res.json().catch(() => ({}));
-                throw new Error(body.message ?? "สร้างไฟล์ไม่สำเร็จ กรุณาลองใหม่");
-            }
-            const url = URL.createObjectURL(await res.blob());
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = fileName;
-            a.click();
-            setTimeout(() => URL.revokeObjectURL(url), 10_000);
-        } catch (err) {
-            toast.error(err instanceof Error ? err.message : "สร้างไฟล์ไม่สำเร็จ กรุณาลองใหม่");
-        } finally {
-            setBusy(false);
-        }
-    }
-    return (
-        <Button type="button" variant={primary ? "primary" : "secondary"} size="sm" onClick={download} disabled={busy} className="w-full sm:w-auto">
-            {busy ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
-            {busy ? "กำลังสร้างไฟล์..." : label}
-        </Button>
-    );
 }
 
 function FormCard({ form, highlight }: { form: PaperForm; highlight?: boolean }) {

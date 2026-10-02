@@ -4,19 +4,20 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { AlertTriangle, Camera, Check, ChevronRight, ImagePlus, Loader2, RotateCcw, ScanLine, Send } from "lucide-react";
-import AutoCamera, { type CaptureOutcome } from "./AutoCamera";
+import { AlertTriangle, Camera, Check, ChevronRight, ImagePlus, Loader2, RotateCcw, ScanLine, Send, Users } from "lucide-react";
+import AutoCamera, { type CaptureOutcome } from "../../AutoCamera";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
 import { CHOICE_LABELS, QUESTIONS_PER_PAGE, paginate } from "@/lib/paper/layout";
-import { RECTIFY_PX_PER_MM, SHADOW_SCORE, grayToRgba, lightingScore, type GrayImage, type QuestionReading } from "@/lib/paper/omr";
-import { CURLED_PAPER_REASON, cropQuestionRow, grayToJpeg, locatePage, readPage, type LocatedPage } from "@/lib/paper/scan";
-import type { Point } from "@/lib/paper/layout";
+import { locatePage, type LocatedPage } from "@/lib/paper/scan";
+import { QuestionPicker, dropPageOverrides, questionStates, scanPage, submitGrade, type Overrides, type PageScan } from "../../scanParts";
 
 // ตรวจกระดาษคำตอบ (ระบบสอบกระดาษ เฟส 2 — CLAUDE.md ข้อ 6.9)
 // ถ่าย/เลือกรูป → อ่านในเครื่อง (lib/paper/scan.ts) → ลูกค้ายืนยันข้อที่อ่านไม่ชัด (+ แก้ข้อไหนก็ได้) → ส่งตรวจ → หน้าเฉลย
 // หลักการเดียวกับตัวอ่าน: **ไม่เดา** — ข้อที่ฝนหลายวง/จาง/ลบไม่หมด ต้องให้ลูกค้าเลือกเองก่อนส่งได้
+// ผู้จัดกลุ่มสอบกระดาษเปิดหน้านี้ตรวจใบของสมาชิกได้ (viewer "organizer" — CLAUDE.md ข้อ 6.9.1): ผลเข้าประวัติของสมาชิก
+// ส่งแล้วกลับหน้าสแกนทั้งกอง (หน้าเฉลยเป็นของสมาชิก ผู้จัดเปิดไม่ได้)
 
 export type PaperFormInfo = {
     code: string;
@@ -28,15 +29,12 @@ export type PaperFormInfo = {
     created_at: string;
     result: { att_id: string; score: number; graded_at: string } | null;
     scanned_pages: number[];
+    viewer: "holder" | "organizer";
+    holder_name: string;
+    group: { id: string; title: string; variant: string | null } | null;
 };
 
-/** shadow = รูปนี้มีเงาทับกระดาษ (omr.lightingScore) — ใช้บอกลูกค้าว่าถ่ายใหม่แล้วจะต้องยืนยันน้อยลง */
-type PageScan = { rect: GrayImage; readings: QuestionReading[]; blob: Blob; preview: string; shadow: boolean };
 type Failure = { name: string; reason: string };
-/** คำตอบสุดท้ายของข้อ: ดัชนีตัวเลือก / null = ไม่ได้ตอบ / undefined = ยังต้องยืนยัน */
-type QuestionState = { number: number; reading: QuestionReading["reading"]; answer: number | null | undefined; edited: boolean; shift?: Point };
-
-const REASON_TEXT = { multiple: "ฝนมากกว่า 1 วง", faint: "ฝนจางเกินไป", erased: "มีรอยลบไม่หมด" } as const;
 
 const TIPS = [
     "วางกระดาษให้เรียบบนพื้นสีเข้ม แสงสว่างพอ ไม่มีเงามือหรือเงาโทรศัพท์ทับ (มีเงา: ยกมือถือสูงขึ้นหรือเอียงเล็กน้อย / เปิดไฟฉาย)",
@@ -44,91 +42,10 @@ const TIPS = [
     "ถ่ายตรงจากด้านบน กระดาษ 1 หน้าต่อ 1 รูป (ชุดที่มีหลายหน้า ถ่ายทีละหน้า เลือกพร้อมกันหลายรูปได้)",
 ];
 
-function stateOf(reading: QuestionReading["reading"], override: number | null | undefined, hasOverride: boolean): QuestionState["answer"] {
-    if (hasOverride) return override;
-    if (reading.kind === "answer") return reading.choice;
-    if (reading.kind === "blank") return null;
-    return undefined;
-}
-
-/** ภาพแถวของข้อหนึ่งจากกระดาษจริง — ให้ลูกค้าเห็นเองว่าฝนไว้แบบไหน ก่อนตัดสินใจ */
-function RowImage({ rect, counts, number, shift }: { rect: GrayImage; counts: number[]; number: number; shift?: Point }) {
-    const ref = useRef<HTMLCanvasElement>(null);
-    useEffect(() => {
-        const canvas = ref.current;
-        const crop = cropQuestionRow(rect, counts, number, shift);
-        if (!canvas || !crop) return;
-        canvas.width = crop.width;
-        canvas.height = crop.height;
-        canvas.getContext("2d")!.putImageData(new ImageData(grayToRgba(crop), crop.width, crop.height), 0, 0);
-    }, [rect, counts, number, shift]);
-    return <canvas ref={ref} className="h-auto w-full max-w-72 rounded-lg border border-slate-200 bg-white" aria-label={`ภาพข้อ ${number} บนกระดาษ`} />;
-}
-
-function QuestionPicker({
-    number,
-    choiceCount,
-    state,
-    rect,
-    counts,
-    onPick,
-}: {
-    number: number;
-    choiceCount: number;
-    state: QuestionState;
-    rect: GrayImage;
-    counts: number[];
-    onPick: (value: number | null) => void;
-}) {
-    const candidates = state.reading.kind === "unclear" ? state.reading.candidates : [];
-    return (
-        <div className="rounded-xl border border-slate-200 bg-white p-3">
-            <div className="mb-2 flex items-center gap-2">
-                <span className="text-sm font-semibold text-slate-800">ข้อ {number}</span>
-                {state.reading.kind === "unclear" && (
-                    <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-700">{REASON_TEXT[state.reading.reason]}</span>
-                )}
-            </div>
-            <RowImage rect={rect} counts={counts} number={number} shift={state.shift} />
-            <div className="mt-3 flex flex-wrap gap-1.5">
-                {Array.from({ length: choiceCount }, (_, c) => (
-                    <button
-                        key={c}
-                        type="button"
-                        aria-pressed={state.answer === c}
-                        onClick={() => onPick(c)}
-                        className={cn(
-                            "h-10 min-w-10 rounded-lg border-2 px-3 text-sm font-semibold transition-colors",
-                            state.answer === c
-                                ? "border-brand-600 bg-brand-600 text-white"
-                                : candidates.includes(c)
-                                  ? "border-amber-300 bg-amber-50 text-amber-800 hover:border-amber-400"
-                                  : "border-slate-200 text-slate-700 hover:border-slate-300"
-                        )}
-                    >
-                        {CHOICE_LABELS[c]}
-                    </button>
-                ))}
-                <button
-                    type="button"
-                    aria-pressed={state.answer === null}
-                    onClick={() => onPick(null)}
-                    className={cn(
-                        "h-10 rounded-lg border-2 px-3 text-sm transition-colors",
-                        state.answer === null ? "border-slate-700 bg-slate-700 text-white" : "border-slate-200 text-slate-500 hover:border-slate-300"
-                    )}
-                >
-                    ไม่ได้ตอบ
-                </button>
-            </div>
-        </div>
-    );
-}
-
 export default function ScanClient({ form }: { form: PaperFormInfo }) {
     const router = useRouter();
     const [pages, setPages] = useState<Record<number, PageScan>>({});
-    const [overrides, setOverrides] = useState<Record<number, number | null>>({});
+    const [overrides, setOverrides] = useState<Overrides>({});
     const [failures, setFailures] = useState<Failure[]>([]);
     const [progress, setProgress] = useState<string | null>(null);
     const [editing, setEditing] = useState<number | null>(null);
@@ -137,6 +54,7 @@ export default function ScanClient({ form }: { form: PaperFormInfo }) {
     const cameraRef = useRef<HTMLInputElement>(null);
     const pickRef = useRef<HTMLInputElement>(null);
     const layout = useMemo(() => paginate(form.choice_counts), [form.choice_counts]);
+    const organizer = form.viewer === "organizer";
 
     // คืนหน่วยความจำของรูปตัวอย่างตอนออกจากหน้า
     const pagesRef = useRef(pages);
@@ -146,24 +64,21 @@ export default function ScanClient({ form }: { form: PaperFormInfo }) {
     useEffect(() => () => Object.values(pagesRef.current).forEach((p) => URL.revokeObjectURL(p.preview)), []);
 
     /** รับหน้าที่อ่านได้แล้ว (จากไฟล์หรือกล้องสด) — ตรวจว่าเป็นของใบนี้ อ่านวง แล้วเก็บ · ใช้ทั้งสองทางจึงมีกติกาชุดเดียว */
-    async function acceptPage({ id, rect }: Extract<LocatedPage, { ok: true }>): Promise<CaptureOutcome> {
+    async function acceptPage(located: Extract<LocatedPage, { ok: true }>): Promise<CaptureOutcome> {
+        const { id } = located;
         if (id.code !== form.code) return { ok: false, reason: `เป็นกระดาษคำตอบของใบสอบ ${id.code} ไม่ใช่ใบนี้ (${form.code})` };
-        const read = id.pages === form.pages ? readPage(rect, form.choice_counts, id.page) : null;
-        if (!read) return { ok: false, reason: "จำนวนหน้าไม่ตรงกับใบสอบนี้ — ใช้กระดาษคำตอบที่ดาวน์โหลดจากใบสอบนี้เท่านั้น" };
-        if (read.problem) return { ok: false, reason: CURLED_PAPER_REASON };
-        const readings = read.readings;
-        const blob = await grayToJpeg(rect);
-        const scan: PageScan = { rect, readings, blob, preview: URL.createObjectURL(blob), shadow: lightingScore(rect, RECTIFY_PX_PER_MM) < SHADOW_SCORE };
+        const result = await scanPage(located, form);
+        if (!result.ok) return result;
+        const { scan } = result;
         setPages((prev) => {
             if (prev[id.page]) URL.revokeObjectURL(prev[id.page].preview);
             return { ...prev, [id.page]: scan };
         });
-        // ถ่ายหน้าเดิมใหม่ = ทิ้งที่แก้ไว้ของหน้านั้น (ผลอ่านชุดใหม่อาจต่างจากเดิม)
+        setOverrides((prev) => dropPageOverrides(prev, id.page, scan.readings.length));
         const first = (id.page - 1) * QUESTIONS_PER_PAGE + 1;
-        const last = first + readings.length - 1;
-        setOverrides((prev) => Object.fromEntries(Object.entries(prev).filter(([n]) => Number(n) < first || Number(n) > last)));
+        const last = first + scan.readings.length - 1;
         setEditing((n) => (n !== null && n >= first && n <= last ? null : n));
-        return { ok: true, page: id.page };
+        return { ok: true, key: String(id.page), label: `หน้า ${id.page}` };
     }
 
     async function handleFiles(list: FileList | null) {
@@ -199,16 +114,7 @@ export default function ScanClient({ form }: { form: PaperFormInfo }) {
         }
     }
 
-    const states = useMemo(() => {
-        const out: QuestionState[] = [];
-        for (const scan of Object.values(pages)) {
-            for (const r of scan.readings) {
-                const has = Object.prototype.hasOwnProperty.call(overrides, r.number);
-                out.push({ number: r.number, reading: r.reading, answer: stateOf(r.reading, overrides[r.number], has), edited: has, shift: r.shift });
-            }
-        }
-        return out.sort((a, b) => a.number - b.number);
-    }, [pages, overrides]);
+    const states = useMemo(() => questionStates(pages, overrides), [pages, overrides]);
     const stateByNumber = useMemo(() => new Map(states.map((s) => [s.number, s])), [states]);
 
     const scannedPages = Object.keys(pages).map(Number).sort((a, b) => a - b);
@@ -225,14 +131,12 @@ export default function ScanClient({ form }: { form: PaperFormInfo }) {
         if (!scannedPages.length || unresolved > 0) return;
         setSubmitting(true);
         try {
-            const answers: (number | null)[] = Array.from({ length: form.question_count }, () => null);
-            for (const s of states) answers[s.number - 1] = s.answer ?? null;
-            const body = new FormData();
-            body.append("answers", JSON.stringify(answers));
-            for (const p of scannedPages) body.append(`page_${p}`, pages[p].blob, `page_${p}.jpg`);
-            const res = await fetch(`/api/paper-forms/${encodeURIComponent(form.code)}/grade`, { method: "POST", body });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) throw new Error(data.message ?? "ส่งตรวจไม่สำเร็จ กรุณาลองใหม่");
+            const data = await submitGrade(form.code, form.question_count, states, pages);
+            if (data.viewer === "organizer" && form.group) {
+                toast.success(`ตรวจใบของ ${form.holder_name} แล้ว ได้ ${data.score.toFixed(0)}% — ผลเข้าประวัติของเขา`);
+                router.push(`/exam/paper/groups/${form.group.id}/scan`);
+                return;
+            }
             toast.success(data.replaced ? "ตรวจใหม่เรียบร้อย — แทนผลเดิมแล้ว" : "ตรวจเรียบร้อย");
             router.push(`/exam/attempts/${data.att_id}/review`);
         } catch (err) {
@@ -254,6 +158,24 @@ export default function ScanClient({ form }: { form: PaperFormInfo }) {
                 </p>
             </div>
 
+            {organizer && form.group && (
+                <Card className="mb-4 flex items-center gap-3 border-brand-100 bg-brand-50/40 p-4">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-100 text-brand-700">
+                        <Users size={19} />
+                    </span>
+                    <div className="min-w-0 flex-1 text-sm">
+                        <p className="font-medium text-slate-800">
+                            ตรวจแทน {form.holder_name}
+                            {form.group.variant && <span className="text-orange-700"> · ชุด {form.group.variant}</span>}
+                        </p>
+                        <p className="text-xs text-slate-500">กลุ่ม {form.group.title} · ผลเข้าประวัติของเขา (คุณเห็นคะแนนตามที่เขายอมรับไว้)</p>
+                    </div>
+                    <Link href={`/exam/paper/groups/${form.group.id}/scan`} className="shrink-0 text-sm font-medium text-brand-700 hover:underline">
+                        สแกนทั้งกอง
+                    </Link>
+                </Card>
+            )}
+
             {form.result && (
                 <Card className="mb-4 flex flex-wrap items-center gap-3 border-green-100 bg-green-50/40 p-4">
                     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-green-100 text-green-700">
@@ -263,13 +185,15 @@ export default function ScanClient({ form }: { form: PaperFormInfo }) {
                         <p className="text-sm font-medium text-slate-800">ใบสอบนี้ตรวจแล้ว ได้ {form.result.score.toFixed(0)}%</p>
                         <p className="text-xs text-slate-500">สแกนใหม่แล้วส่งตรวจ = แทนผลเดิม (ผลเดิมจะหายไป)</p>
                     </div>
-                    <Link
-                        href={`/exam/attempts/${form.result.att_id}/review`}
-                        className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-50"
-                    >
-                        ดูผลและเฉลย
-                        <ChevronRight size={15} />
-                    </Link>
+                    {!organizer && (
+                        <Link
+                            href={`/exam/attempts/${form.result.att_id}/review`}
+                            className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-50"
+                        >
+                            ดูผลและเฉลย
+                            <ChevronRight size={15} />
+                        </Link>
+                    )}
                     {form.scanned_pages.length > 0 && (
                         <p className="w-full text-xs text-slate-500">
                             ภาพที่สแกนไว้ (เก็บ 90 วัน):{" "}
@@ -480,8 +404,9 @@ export default function ScanClient({ form }: { form: PaperFormInfo }) {
 
             {liveCamera && (
                 <AutoCamera
-                    totalPages={form.pages}
-                    scannedPages={scannedPages}
+                    expected={layout.map((_, i) => ({ key: String(i + 1), label: `หน้า ${i + 1}` }))}
+                    doneKeys={scannedPages.map(String)}
+                    keyOf={(located) => String(located.id.page)}
                     onCapture={acceptPage}
                     onClose={() => setLiveCamera(false)}
                     onFallback={() => {

@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { BookOpenCheck, ChevronRight, ClipboardList, FileQuestion, Printer, Timer } from "lucide-react";
+import { BookOpenCheck, ChevronRight, ClipboardList, FileQuestion, Printer, Timer, Users } from "lucide-react";
 import Navbar from "@/app/components/Navbar";
 import Footer from "@/app/components/Footer";
 import ExportPdfButton from "@/app/components/ExportPdfButton";
@@ -31,7 +31,11 @@ const STATUS_LABEL: Record<Entitlement["effective_status"], string> = {
 
 export default async function LibraryPage() {
     // ปุ่ม "สอบแบบกระดาษ" ขึ้นเฉพาะตอนเปิดฟีเจอร์ paper_exam (เมนู "เปิดใช้งานระบบ" ของแอดมิน)
-    const [res, paperEnabled] = await Promise.all([authorizedFetch("/store/my/entitlements"), isFeatureEnabled("paper_exam")]);
+    const [res, paperEnabled, groupsEnabled] = await Promise.all([
+        authorizedFetch("/store/my/entitlements"),
+        isFeatureEnabled("paper_exam"),
+        isFeatureEnabled("paper_group_exam"),
+    ]);
     const { data: entitlements }: { data: Entitlement[] } = res.ok ? await res.json() : { data: [] };
 
     return (
@@ -70,6 +74,22 @@ export default async function LibraryPage() {
                                 <span className="mt-0.5 block text-xs text-slate-400">
                                     ทบทวนข้อที่เคยพลาดวันละนิด ระบบนัดทวนซ้ำให้เองจนกว่าจะจำได้จริง
                                 </span>
+                            </span>
+                            <ChevronRight size={18} className="shrink-0 text-slate-300" />
+                        </Card>
+                    </Link>
+                )}
+
+                {/* กลุ่มสอบกระดาษ — ขึ้นแม้ไม่มีชุดข้อสอบ เพราะเพื่อนที่ยังไม่ซื้อก็เข้ากลุ่มได้ (CLAUDE.md ข้อ 6.9.1) */}
+                {paperEnabled && groupsEnabled && (
+                    <Link href="/exam/paper/groups" className="mb-8 block">
+                        <Card className="flex items-center gap-4 p-5 transition-colors hover:border-brand-200">
+                            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-green-50 text-green-600">
+                                <Users size={20} />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                                <span className="block font-medium text-slate-800">กลุ่มสอบกระดาษ</span>
+                                <span className="mt-0.5 block text-xs text-slate-400">ชวนเพื่อนสอบกระดาษพร้อมกัน — กลุ่มที่คุณจัดและกลุ่มที่เพื่อนชวน</span>
                             </span>
                             <ChevronRight size={18} className="shrink-0 text-slate-300" />
                         </Card>

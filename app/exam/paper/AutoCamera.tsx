@@ -13,7 +13,14 @@ import { grayFromVideo, locateGray, type LocatedPage } from "@/lib/paper/scan";
 // ความแม่นที่ความละเอียดวิดีโอ (1080×1920, 1440×1920) วัดด้วย _perf-tmp/paper-omr-harness.mjs แล้ว: ผิดโดยไม่เตือน 0
 // กติกา "ไม่เดา" เหมือนเดิมทุกอย่าง — ข้อที่ไม่ชัดยังต้องให้ลูกค้ายืนยันในหน้าหลักหลังปิดกล้อง
 
-export type CaptureOutcome = { ok: true; page: number } | { ok: false; reason: string };
+/** ok: key = รหัสของแผ่นที่รับไว้ (ตรงกับ keyOf) · label = ชื่อที่บอกบนจอ เช่น "หน้า 2" / "สมชาย ใจดี" */
+export type CaptureOutcome = { ok: true; key: string; label: string } | { ok: false; reason: string };
+
+/** แผ่นที่ต้องสแกนในรอบนี้ — ใบเดียวหลายหน้า: key = "1","2"… · ทั้งกอง: key = "<รหัสใบสอบ>|<หน้า>" */
+export type ExpectedSheet = { key: string; label: string };
+
+/** เกินนี้แสดงเป็นตัวนับแทนรายการชิป (สแกนทั้งกองหลายสิบคนไม่พอที่บนจอ) */
+const MAX_CHIPS = 6;
 
 const DETECT_EVERY_MS = 250;
 const DETECT_MAX_SIDE = 960;
@@ -68,15 +75,19 @@ function cameraErrorText(err: unknown): string {
 }
 
 export default function AutoCamera({
-    totalPages,
-    scannedPages,
+    expected,
+    doneKeys,
+    keyOf,
     onCapture,
     onClose,
     onFallback,
 }: {
-    totalPages: number;
-    /** หน้าที่สแกนไว้แล้วก่อนเปิดกล้อง (นับรวมตอนเช็คว่าครบทุกหน้าหรือยัง) */
-    scannedPages: number[];
+    /** แผ่นทั้งหมดที่ต้องสแกน — ครบแล้วปิดกล้องเอง */
+    expected: ExpectedSheet[];
+    /** แผ่นที่สแกนไว้แล้วก่อนเปิดกล้อง (นับรวมตอนเช็คว่าครบหรือยัง) */
+    doneKeys: string[];
+    /** รหัสของแผ่นที่อ่านได้ — แผ่นเดิมที่ยังอยู่ในเฟรมจะไม่ถูกถ่ายวนซ้ำในรอบนี้ */
+    keyOf: (located: Extract<LocatedPage, { ok: true }>) => string;
     onCapture: (located: Extract<LocatedPage, { ok: true }>) => Promise<CaptureOutcome>;
     onClose: () => void;
     /** เปิดกล้องสดไม่ได้ → ใช้กล้องของเครื่องแทน (input capture) */
@@ -89,7 +100,7 @@ export default function AutoCamera({
     const [reading, setReading] = useState(false);
     const [found, setFound] = useState(false);
     const [flash, setFlash] = useState(false);
-    const [sessionPages, setSessionPages] = useState<number[]>([]);
+    const [sessionKeys, setSessionKeys] = useState<string[]>([]);
     const shootNowRef = useRef(false);
     // ไฟฉาย — มีเฉพาะเครื่องที่เบราว์เซอร์ให้สั่งได้ (Android Chrome) · ช่วยลบเงามือ/เงามือถือบนกระดาษ
     const trackRef = useRef<MediaStreamTrack | null>(null);
@@ -108,9 +119,9 @@ export default function AutoCamera({
     }
 
     // ค่าล่าสุดของ props ให้ลูปกล้องอ่าน — ไม่ใส่เป็น dependency ไม่งั้นกล้องปิด-เปิดใหม่ทุกครั้งที่หน้าหลักเรนเดอร์
-    const latest = useRef({ onCapture, onClose, scannedPages, totalPages });
+    const latest = useRef({ onCapture, onClose, doneKeys, expected, keyOf });
     useEffect(() => {
-        latest.current = { onCapture, onClose, scannedPages, totalPages };
+        latest.current = { onCapture, onClose, doneKeys, expected, keyOf };
     });
 
     // ล็อกการเลื่อนหน้าข้างหลังระหว่างเปิดกล้องเต็มจอ
@@ -126,7 +137,7 @@ export default function AutoCamera({
         const video = videoRef.current!;
         const overlay = overlayRef.current!;
         const work = document.createElement("canvas");
-        const session = new Set<number>();
+        const session = new Set<string>();
         let stream: MediaStream | null = null;
         let stopped = false;
         let timer = 0;
@@ -156,8 +167,10 @@ export default function AutoCamera({
                     pause(1200);
                     return;
                 }
-                if (session.has(located.id.page)) {
-                    setHint({ tone: "warn", text: `หน้า ${located.id.page} สแกนแล้ว — เปลี่ยนเป็นหน้าถัดไป` });
+                const key = latest.current.keyOf(located);
+                if (session.has(key)) {
+                    const label = latest.current.expected.find((e) => e.key === key)?.label ?? "แผ่นนี้";
+                    setHint({ tone: "warn", text: `${label} สแกนแล้ว — เปลี่ยนเป็นแผ่นถัดไป` });
                     pause(1500);
                     return;
                 }
@@ -167,19 +180,19 @@ export default function AutoCamera({
                     pause(2500);
                     return;
                 }
-                session.add(outcome.page);
-                setSessionPages([...session].sort((a, b) => a - b));
+                session.add(outcome.key);
+                setSessionKeys([...session]);
                 navigator.vibrate?.(60);
                 setFlash(true);
                 setTimeout(() => setFlash(false), 150);
-                const done = new Set([...latest.current.scannedPages, ...session]);
-                if (done.size >= latest.current.totalPages) {
-                    setHint({ tone: "ok", text: latest.current.totalPages > 1 ? "สแกนครบทุกหน้าแล้ว" : "สแกนเรียบร้อย" });
+                const done = new Set([...latest.current.doneKeys, ...session]);
+                if (latest.current.expected.every((e) => done.has(e.key))) {
+                    setHint({ tone: "ok", text: latest.current.expected.length > 1 ? "สแกนครบทุกแผ่นแล้ว" : "สแกนเรียบร้อย" });
                     stopped = true;
                     setTimeout(() => latest.current.onClose(), 900);
                     return;
                 }
-                setHint({ tone: "ok", text: `หน้า ${outcome.page} เรียบร้อย — เปลี่ยนเป็นหน้าถัดไป` });
+                setHint({ tone: "ok", text: `${outcome.label} เรียบร้อย — เปลี่ยนเป็นแผ่นถัดไป` });
                 pause(1500);
             } finally {
                 setReading(false);
@@ -274,7 +287,7 @@ export default function AutoCamera({
         };
     }, []);
 
-    const allPages = Array.from({ length: totalPages }, (_, i) => i + 1);
+    const doneCount = expected.filter((e) => sessionKeys.includes(e.key) || doneKeys.includes(e.key)).length;
 
     return (
         <div role="dialog" aria-modal="true" aria-label="สแกนกระดาษคำตอบอัตโนมัติ" className="fixed inset-0 z-[70] flex flex-col bg-black text-white">
@@ -315,23 +328,30 @@ export default function AutoCamera({
                             {torch.on ? <Flashlight size={18} /> : <FlashlightOff size={18} />}
                         </button>
                     )}
-                    <div className="flex gap-1">
-                        {allPages.map((p) => {
-                            const done = sessionPages.includes(p) || scannedPages.includes(p);
-                            return (
-                                <span
-                                    key={p}
-                                    className={cn(
-                                        "inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs",
-                                        sessionPages.includes(p) ? "bg-green-500 text-white" : done ? "bg-white/25" : "bg-white/10 text-white/70"
-                                    )}
-                                >
-                                    {sessionPages.includes(p) && <Check size={11} />}
-                                    หน้า {p}
-                                </span>
-                            );
-                        })}
-                    </div>
+                    {expected.length > MAX_CHIPS ? (
+                        <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-xs tabular-nums">
+                            สแกนแล้ว {doneCount}/{expected.length}
+                        </span>
+                    ) : (
+                        <div className="flex gap-1">
+                            {expected.map((e) => {
+                                const now = sessionKeys.includes(e.key);
+                                const done = now || doneKeys.includes(e.key);
+                                return (
+                                    <span
+                                        key={e.key}
+                                        className={cn(
+                                            "inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs",
+                                            now ? "bg-green-500 text-white" : done ? "bg-white/25" : "bg-white/10 text-white/70"
+                                        )}
+                                    >
+                                        {now && <Check size={11} />}
+                                        {e.label}
+                                    </span>
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
 
                 {error && (

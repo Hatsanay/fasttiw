@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Check, X, MinusCircle, ListChecks, ChevronRight, RotateCcw, TrendingUp, TrendingDown, Users } from "lucide-react";
+import { Check, X, MinusCircle, ListChecks, ChevronRight, RotateCcw, TrendingUp, TrendingDown, Users, Lock } from "lucide-react";
 import Navbar from "@/app/components/Navbar";
 import Footer from "@/app/components/Footer";
 import Card from "@/components/ui/Card";
@@ -61,6 +61,9 @@ type Review = {
     peer_comparison: { peers: number; better_than_percent: number; average_score: number } | null;
     topic_breakdown: TopicResult[];
     questions: ReviewQuestion[];
+    /** ผลสอบกระดาษของคนที่ไม่มีสิทธิ์ชุดนี้ (สมาชิกกลุ่มสอบกระดาษ) — ไม่มีรายข้อ/เฉลย มีแค่สรุป (CLAUDE.md ข้อ 6.9.1) */
+    solutions_locked?: boolean;
+    answer_counts?: { correct: number; wrong: number; skipped: number } | null;
 };
 
 // เวลาที่ใช้ทำจริง — คิดจากเวลาเริ่มถึงเวลาส่ง เหมือนที่หน้า /history ใช้
@@ -86,7 +89,9 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
 
     // นับจาก is_correct ที่ freeze ไว้ตอนตอบจริง ห้ามเทียบกับ reveal.correct_choice_id (เฉลยสดปัจจุบัน) ตรงๆ
     // เพราะถ้าแอดมินแก้เฉลยทีหลัง (เช่น มีคนแจ้งปัญหาข้อนี้) ตัวเลขจะไม่ตรงกับ % คะแนนรวมด้านบนที่ freeze ไว้แล้ว
-    const correctCount = review.questions.filter((q) => q.is_correct).length;
+    const locked = !!review.solutions_locked;
+    const counts = locked ? review.answer_counts : null;
+    const correctCount = counts ? counts.correct : review.questions.filter((q) => q.is_correct).length;
 
     // ชุดนี้ใช้ระบบคะแนนไหม — ดูจาก att_max_score ที่ freeze ไว้ตอนเริ่มทำ ไม่ใช่ค่าปัจจุบันของชุดข้อสอบ
     // (แอดมินอาจเปิด/ปิดระบบคะแนนทีหลัง ผลสอบใบนี้ต้องแสดงตามกติกา ณ ตอนที่ลูกค้าทำจริง)
@@ -98,8 +103,8 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
     // นับทั้งสองค่าจากคำถามที่มีอยู่จริงตรงๆ ไม่ใช่ลบออกจาก att_total_questions — ถ้าแอดมินปิดคำถามบางข้อ
     // หลังลูกค้าทำไปแล้ว ข้อนั้นจะหายจาก questions แต่ att_total_questions ที่ freeze ไว้ยังนับรวมอยู่
     // การลบจะทำให้ข้อที่ถูกปิดไปโผล่เป็น "ตอบผิด" ทั้งที่ลูกค้าอาจตอบถูก
-    const skippedCount = review.questions.filter((q) => !q.selected_choice_id).length;
-    const wrongCount = review.questions.filter((q) => q.selected_choice_id && !q.is_correct).length;
+    const skippedCount = counts ? counts.skipped : review.questions.filter((q) => !q.selected_choice_id).length;
+    const wrongCount = counts ? counts.wrong : review.questions.filter((q) => q.selected_choice_id && !q.is_correct).length;
     // สอบแบบกระดาษ: ระบบไม่รู้ว่าทำบนกระดาษนานเท่าไหร่ (เวลาในผลคือตอนส่งตรวจ) — บอกรหัสใบสอบแทน
     const paperCode = review.paper_form_code ?? null;
     const duration = paperCode ? null : formatDuration(review.att_started_at, review.att_submitted_at);
@@ -274,6 +279,24 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
                     </Link>
                 </div>
 
+                {/* ไม่มีสิทธิ์ชุดนี้: เห็นสรุปข้างบนครบ แต่ไม่มีรายข้อ — ไม่งั้นซื้อ 1 คนแจกเฉลยทั้งกลุ่มได้ */}
+                {locked && (
+                    <Card className="flex flex-col items-center gap-3 border-brand-100 bg-brand-50/40 p-6 text-center">
+                        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-100 text-brand-700">
+                            <Lock size={22} />
+                        </span>
+                        <div>
+                            <p className="font-medium text-slate-800">ดูเฉลยละเอียดทีละข้อ</p>
+                            <p className="mt-1 text-sm text-slate-500">
+                                ข้อไหนผิด ตอบข้อไหนถึงถูก วิธีคิดทีละขั้น และเหตุผลว่าทำไมตัวเลือกอื่นผิด — เปิดให้เมื่อมีชุดข้อสอบนี้
+                            </p>
+                        </div>
+                        <Link href={`/products/${review.att_product_id}`}>
+                            <Button>ดูชุดข้อสอบนี้</Button>
+                        </Link>
+                    </Card>
+                )}
+
                 <div className="flex flex-col gap-6">
                     {review.questions.map((q, i) => {
                         const isCorrect = q.is_correct;
@@ -349,12 +372,14 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
                 </div>
 
                 <div className="mt-10 flex flex-wrap justify-center gap-3">
-                    <Link href={`/exam/${review.att_product_id}`}>
-                        <Button className="inline-flex items-center gap-1.5">
-                            <RotateCcw size={15} />
-                            ทำชุดนี้อีกครั้ง
-                        </Button>
-                    </Link>
+                    {!locked && (
+                        <Link href={`/exam/${review.att_product_id}`}>
+                            <Button className="inline-flex items-center gap-1.5">
+                                <RotateCcw size={15} />
+                                ทำชุดนี้อีกครั้ง
+                            </Button>
+                        </Link>
+                    )}
                     <Link href="/library">
                         <Button variant="secondary">กลับไปคลังข้อสอบ</Button>
                     </Link>
