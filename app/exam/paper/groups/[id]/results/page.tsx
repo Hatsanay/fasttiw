@@ -6,7 +6,7 @@ import Footer from "@/app/components/Footer";
 import Card from "@/components/ui/Card";
 import { cn } from "@/lib/cn";
 import { authorizedFetch } from "@/lib/session";
-import { isFeatureEnabled } from "@/lib/publicData";
+import { featuresEnabledNow } from "@/lib/featureFlags";
 import type { GroupResults } from "@/lib/paper/groups";
 import DownloadButton from "../../../DownloadButton";
 
@@ -36,7 +36,7 @@ export default async function GroupResultsPage({
     params: Promise<{ id: string }>;
     searchParams: Promise<{ round?: string }>;
 }) {
-    const [paperOn, groupOn] = await Promise.all([isFeatureEnabled("paper_exam"), isFeatureEnabled("paper_group_exam")]);
+    const [paperOn, groupOn] = await featuresEnabledNow("paper_exam", "paper_group_exam");
     if (!paperOn || !groupOn) notFound();
     const [{ id }, { round }] = await Promise.all([params, searchParams]);
     if (!/^[A-Za-z0-9-]{1,40}$/.test(id)) notFound();

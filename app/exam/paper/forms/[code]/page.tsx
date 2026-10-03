@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import Navbar from "@/app/components/Navbar";
 import Footer from "@/app/components/Footer";
 import { authorizedFetch } from "@/lib/session";
-import { isFeatureEnabled } from "@/lib/publicData";
+import { isFeatureEnabledNow } from "@/lib/featureFlags";
 import ScanClient, { type PaperFormInfo } from "./ScanClient";
 
 // สแกนกระดาษคำตอบของใบสอบหนึ่งใบ → ตรวจ → ไปหน้าเฉลย (ระบบสอบกระดาษ เฟส 2 — CLAUDE.md ข้อ 6.9)
@@ -10,7 +10,7 @@ import ScanClient, { type PaperFormInfo } from "./ScanClient";
 export const metadata = { title: "ตรวจกระดาษคำตอบ", robots: { index: false } };
 
 export default async function PaperFormPage({ params }: { params: Promise<{ code: string }> }) {
-    if (!(await isFeatureEnabled("paper_exam"))) notFound();
+    if (!(await isFeatureEnabledNow("paper_exam"))) notFound();
     const { code } = await params;
     const res = await authorizedFetch(`/store/paper-forms/${encodeURIComponent(code)}`);
     if (!res.ok) notFound();

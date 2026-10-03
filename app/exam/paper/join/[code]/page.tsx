@@ -5,7 +5,7 @@ import Navbar from "@/app/components/Navbar";
 import Footer from "@/app/components/Footer";
 import Card from "@/components/ui/Card";
 import { authorizedFetch } from "@/lib/session";
-import { isFeatureEnabled } from "@/lib/publicData";
+import { featuresEnabledNow } from "@/lib/featureFlags";
 import type { JoinPreview } from "@/lib/paper/groups";
 import JoinClient from "./JoinClient";
 
@@ -14,7 +14,7 @@ import JoinClient from "./JoinClient";
 export const metadata = { title: "เข้ากลุ่มสอบกระดาษ", robots: { index: false } };
 
 export default async function JoinPaperGroupPage({ params }: { params: Promise<{ code: string }> }) {
-    const [paperOn, groupOn] = await Promise.all([isFeatureEnabled("paper_exam"), isFeatureEnabled("paper_group_exam")]);
+    const [paperOn, groupOn] = await featuresEnabledNow("paper_exam", "paper_group_exam");
     if (!paperOn || !groupOn) notFound();
     const { code } = await params;
     if (!/^[A-Za-z0-9-]{1,40}$/.test(code)) notFound();

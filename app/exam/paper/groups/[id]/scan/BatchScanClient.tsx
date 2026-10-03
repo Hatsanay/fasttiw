@@ -9,7 +9,8 @@ import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
 import { QUESTIONS_PER_PAGE } from "@/lib/paper/layout";
-import { locatePage, type LocatedPage } from "@/lib/paper/scan";
+import type { LocatedPage } from "@/lib/paper/scan";
+import { locateFile } from "@/lib/paper/scanWorker";
 import type { GroupSheet, GroupSheetsData } from "@/lib/paper/printData";
 import { QuestionPicker, dropPageOverrides, questionStates, scanPage, submitGrade, type Overrides, type PageScan } from "../../../scanParts";
 
@@ -144,9 +145,8 @@ export default function BatchScanClient({ groupId, data }: { groupId: string; da
         const failed: Failure[] = [];
         for (const [i, file] of files.entries()) {
             setProgress(`กำลังอ่านรูปที่ ${i + 1} จาก ${files.length}...`);
-            await new Promise((r) => setTimeout(r, 30));
             try {
-                const located = await locatePage(file);
+                const located = await locateFile(file);
                 const outcome = located.ok ? await acceptPage(located) : located;
                 if (!outcome.ok) failed.push({ name: `รูปที่ ${i + 1}`, reason: outcome.reason });
             } catch {

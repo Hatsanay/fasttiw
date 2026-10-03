@@ -206,12 +206,13 @@ export type OutcomeStats = {
     testimonials: { name: string | null; comment: string; outcome: "passed" | "failed"; round_name: string }[];
 };
 
-/** { key: เปิดอยู่ไหม } ของฟีเจอร์ที่ backend ส่งให้หน้าเว็บลูกค้า (เมนู "เปิดใช้งานระบบ" ฝั่งแอดมิน)
- *  ดึงไม่ได้ = {} → ทุกฟีเจอร์ถือว่าปิด (ฟีเจอร์ใหม่ปิดไว้ก่อนเสมออยู่แล้ว หน้าเว็บจึงเหมือนก่อนมีฟีเจอร์นั้น) */
-export async function getFeatureFlags(): Promise<Record<string, boolean>> {
-    const res = await fetch(`${API_URL}/store/feature-flags`).catch(() => null);
-    if (!res?.ok) return {};
-    return res.json().catch(() => ({}));
+/** { key: เปิดอยู่ไหม } ของฟีเจอร์ที่ backend ส่งให้หน้าเว็บลูกค้า (เมนู "เปิดใช้งานระบบ" ฝั่งแอดมิน) — ค่าสดทุกครั้ง
+ *  ดึงไม่ได้ = null ให้ผู้เรียกตัดสินใจว่าจะถอยไปใช้ค่าไหน (ห้ามตีความเป็น "ปิดหมด" แล้วจำไว้ — ทุกหน้าที่ผูกสวิตช์จะ 404
+ *  ไปทั้งช่วงที่จำ เจอจริงช่วง backend รีสตาร์ท) · ตัวเรียกอยู่ที่ lib/publicData.ts และ lib/featureFlags.ts */
+export async function fetchFeatureFlags(): Promise<Record<string, boolean> | null> {
+    const res = await fetch(`${API_URL}/store/feature-flags`, { cache: "no-store" }).catch(() => null);
+    if (!res?.ok) return null;
+    return res.json().catch(() => null);
 }
 
 export async function getOutcomeStats(): Promise<OutcomeStats> {

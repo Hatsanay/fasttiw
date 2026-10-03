@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import Navbar from "@/app/components/Navbar";
 import Footer from "@/app/components/Footer";
 import Card from "@/components/ui/Card";
-import { isFeatureEnabled } from "@/lib/publicData";
+import { featuresEnabledNow } from "@/lib/featureFlags";
 import { fetchGroupSheets } from "@/lib/paper/printData";
 import BatchScanClient from "./BatchScanClient";
 
@@ -12,7 +12,7 @@ import BatchScanClient from "./BatchScanClient";
 export const metadata = { title: "สแกนกระดาษคำตอบทั้งกลุ่ม", robots: { index: false } };
 
 export default async function GroupScanPage({ params }: { params: Promise<{ id: string }> }) {
-    const [paperOn, groupOn] = await Promise.all([isFeatureEnabled("paper_exam"), isFeatureEnabled("paper_group_exam")]);
+    const [paperOn, groupOn] = await featuresEnabledNow("paper_exam", "paper_group_exam");
     if (!paperOn || !groupOn) notFound();
     const { id } = await params;
     if (!/^[A-Za-z0-9-]{1,40}$/.test(id)) notFound();

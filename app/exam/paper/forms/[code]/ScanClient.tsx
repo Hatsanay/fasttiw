@@ -10,7 +10,8 @@ import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
 import { CHOICE_LABELS, QUESTIONS_PER_PAGE, paginate } from "@/lib/paper/layout";
-import { locatePage, type LocatedPage } from "@/lib/paper/scan";
+import type { LocatedPage } from "@/lib/paper/scan";
+import { locateFile } from "@/lib/paper/scanWorker";
 import { QuestionPicker, dropPageOverrides, questionStates, scanPage, submitGrade, type Overrides, type PageScan } from "../../scanParts";
 
 // ตรวจกระดาษคำตอบ (ระบบสอบกระดาษ เฟส 2 — CLAUDE.md ข้อ 6.9)
@@ -87,11 +88,9 @@ export default function ScanClient({ form }: { form: PaperFormInfo }) {
         const failed: Failure[] = [];
         for (const [i, file] of files.entries()) {
             setProgress(files.length > 1 ? `กำลังอ่านรูปที่ ${i + 1} จาก ${files.length}...` : "กำลังอ่านกระดาษคำตอบ...");
-            // ให้จอวาดข้อความก่อนเริ่มงานหนัก (อ่านรูปทำบนเธรดหลัก ~1-2 วินาทีบนมือถือ)
-            await new Promise((r) => setTimeout(r, 30));
             const name = files.length > 1 ? `รูปที่ ${i + 1}` : "รูปนี้";
             try {
-                const located = await locatePage(file);
+                const located = await locateFile(file);
                 const outcome = located.ok ? await acceptPage(located) : located;
                 if (!outcome.ok) failed.push({ name, reason: outcome.reason });
             } catch {

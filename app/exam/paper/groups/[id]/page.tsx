@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import Navbar from "@/app/components/Navbar";
 import Footer from "@/app/components/Footer";
 import { authorizedFetch } from "@/lib/session";
-import { isFeatureEnabled } from "@/lib/publicData";
+import { featuresEnabledNow } from "@/lib/featureFlags";
 import type { PaperGroup } from "@/lib/paper/groups";
 import GroupClient from "./GroupClient";
 
@@ -11,7 +11,7 @@ import GroupClient from "./GroupClient";
 export const metadata = { title: "กลุ่มสอบกระดาษ", robots: { index: false } };
 
 export default async function PaperGroupPage({ params }: { params: Promise<{ id: string }> }) {
-    const [paperOn, groupOn] = await Promise.all([isFeatureEnabled("paper_exam"), isFeatureEnabled("paper_group_exam")]);
+    const [paperOn, groupOn] = await featuresEnabledNow("paper_exam", "paper_group_exam");
     if (!paperOn || !groupOn) notFound();
     const { id } = await params;
     const res = await authorizedFetch(`/store/paper-groups/${encodeURIComponent(id)}`);

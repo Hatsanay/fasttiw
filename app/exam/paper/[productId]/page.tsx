@@ -2,7 +2,8 @@ import { notFound } from "next/navigation";
 import Navbar from "@/app/components/Navbar";
 import Footer from "@/app/components/Footer";
 import { authorizedFetch } from "@/lib/session";
-import { getPublicProduct, isFeatureEnabled } from "@/lib/publicData";
+import { getPublicProduct } from "@/lib/publicData";
+import { featuresEnabledNow } from "@/lib/featureFlags";
 import type { PaperGroup } from "@/lib/paper/groups";
 import PaperSetupClient, { type PaperForm } from "./PaperSetupClient";
 import GroupSection from "./GroupSection";
@@ -12,7 +13,7 @@ import GroupSection from "./GroupSection";
 export const metadata = { title: "สอบแบบกระดาษ" };
 
 export default async function PaperSetupPage({ params }: { params: Promise<{ productId: string }> }) {
-    const [paperOn, groupOn] = await Promise.all([isFeatureEnabled("paper_exam"), isFeatureEnabled("paper_group_exam")]);
+    const [paperOn, groupOn] = await featuresEnabledNow("paper_exam", "paper_group_exam");
     if (!paperOn) notFound();
     const { productId } = await params;
     const [product, formsRes, groupsRes] = await Promise.all([

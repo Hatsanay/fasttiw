@@ -3,12 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Camera, Check, Flashlight, FlashlightOff, Loader2, X } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { FIDUCIALS, type Point } from "@/lib/paper/layout";
-import { SHADOW_SCORE, findFiducials, homography, lightingScore, rectify } from "@/lib/paper/omr";
-import { grayFromVideo, locateGray, type LocatedPage } from "@/lib/paper/scan";
+import type { Point } from "@/lib/paper/layout";
+import { SHADOW_SCORE } from "@/lib/paper/omr";
+import { grayFromVideo, type LocatedPage } from "@/lib/paper/scan";
+import { detectFrame, locateImage } from "@/lib/paper/scanWorker";
 
 // สแกนอัตโนมัติด้วยกล้องสด (ระบบสอบกระดาษ — CLAUDE.md ข้อ 6.9)
-// ดูเฟรมกล้องทุก ~0.25 วิ หาสี่เหลี่ยมดำ 4 มุม (ภาพย่อ ~960px เร็วพอทำทุกเฟรม) → กระดาษอยู่นิ่งครบ ~1 วิ → จับเฟรมเต็ม
+// ดูเฟรมกล้องทุก ~0.25 วิ หาสี่เหลี่ยมดำ 4 มุม (ภาพย่อ ~960px · หาใน Web Worker วิดีโอบนจอจึงไม่กระตุก) → กระดาษอยู่นิ่งครบ ~1 วิ → จับเฟรมเต็ม
 // ความละเอียดแล้วอ่านจริง (QR + วง) · อ่านไม่ผ่านก็สแกนต่อเอง ลูกค้าแค่ถือให้นิ่ง
 // ความแม่นที่ความละเอียดวิดีโอ (1080×1920, 1440×1920) วัดด้วย _perf-tmp/paper-omr-harness.mjs แล้ว: ผิดโดยไม่เตือน 0
 // กติกา "ไม่เดา" เหมือนเดิมทุกอย่าง — ข้อที่ไม่ชัดยังต้องให้ลูกค้ายืนยันในหน้าหลักหลังปิดกล้อง
@@ -158,10 +159,10 @@ export default function AutoCamera({
         async function capture() {
             setReading(true);
             setHint({ tone: "info", text: "กำลังอ่านกระดาษคำตอบ..." });
-            // ให้จอวาดข้อความก่อนเริ่มงานหนัก (อ่านเฟรมเต็มบนเธรดหลัก)
-            await new Promise((r) => setTimeout(r, 30));
             try {
-                const located = locateGray(grayFromVideo(video, work));
+                // อ่านเฟรมเต็มความละเอียดใน Web Worker — จอยังขยับได้ระหว่างอ่าน
+                const located = await locateImage(grayFromVideo(video, work));
+                if (stopped) return;
                 if (!located.ok) {
                     setHint({ tone: "warn", text: located.reason });
                     pause(1200);
@@ -209,8 +210,11 @@ export default function AutoCamera({
                 } else {
                     const small = grayFromVideo(video, work, DETECT_MAX_SIDE);
                     const scale = video.videoWidth / small.width;
-                    const result = findFiducials(small);
-                    if (!result.ok) {
+                    // หามุม + วัดเงา (ภาพตรงหยาบ 2 px/มม.) ใน Web Worker — วัดเงาทุกเฟรมได้เพราะไม่กินเธรดหลัก
+                    // แต่ใช้ผลเงาเฉพาะตอนเริ่มนิ่งแล้ว (ช่วงมือยังขยับ เงาวัดได้ไม่นิ่ง)
+                    const result = await detectFrame(small, true);
+                    if (stopped) return;
+                    if (!result.corners) {
                         prev = null;
                         steadyCount = 0;
                         shadowSince = null;
@@ -230,13 +234,7 @@ export default function AutoCamera({
                             drawQuad(overlay, video, corners, false);
                             setHint({ tone: "warn", text: "ขยับกล้องเข้าใกล้อีกนิด ให้กระดาษเต็มจอ" });
                         } else {
-                            // เงาทับกระดาษ? ดึงภาพตรงหยาบๆ (2 px/มม. จากภาพย่อ ~5 ms) แล้ววัดความสม่ำเสมอของแสง
-                            // วัดเฉพาะตอนเริ่มนิ่งแล้ว ช่วงมือยังขยับไม่ต้องเสียเวลาคำนวณ
-                            let shadow = false;
-                            if (steadyCount >= 2) {
-                                const low = rectify(small, homography(FIDUCIALS, result.corners), 2);
-                                shadow = lightingScore(low, 2) < SHADOW_SCORE;
-                            }
+                            const shadow = steadyCount >= 2 && result.lighting !== null && result.lighting < SHADOW_SCORE;
                             if (shadow) shadowSince ??= Date.now();
                             else shadowSince = null;
                             const waitShadow = shadowSince !== null && Date.now() - shadowSince < SHADOW_GRACE_MS;

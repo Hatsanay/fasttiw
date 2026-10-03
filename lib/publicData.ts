@@ -75,10 +75,20 @@ export async function getDiagnosticCategories() {
 // เปิด/ปิดฟีเจอร์ (เมนู "เปิดใช้งานระบบ" ฝั่งแอดมิน) — ค่าเดียวกันสำหรับทุกคน จึง cache ร่วมกันได้
 // แอดมินกดเปิด/ปิดแล้วหน้าเว็บลูกค้าเปลี่ยนตามภายใน ~1 นาที (หน้ายืนยันของแอดมินบอกไว้แล้ว)
 // ⚠ ใช้ซ่อน/แสดงส่วนของหน้าเท่านั้น — ตัวกันจริงอยู่ที่ backend (requireFeature) เสมอ
-export async function getFeatureFlags() {
+//
+// ⚠ ใช้กับ **หน้าสาธารณะ/หน้าสำเร็จรูป** เท่านั้น (หน้าแรก, แล็บ) — cache แบบ stale-while-revalidate: คำขอแรกหลังค่าเก่าเกิน
+// 1 นาทีได้ค่าเก่า (ต่อโปรเซส) · หน้าที่ต้องล็อกอินใช้ isFeatureEnabledNow (lib/featureFlags.ts) ไม่งั้นเปิดสวิตช์แล้ว
+// ลูกค้าเจอ 404 แวบหนึ่ง (เจอจริงบน production 2026-10-03)
+// ดึงไม่ได้ = จำไว้แค่ช่วงสั้น (cacheLife "seconds") ไม่ใช่ 1 นาทีเต็ม — ไม่งั้นช่วง backend รีสตาร์ททุกฟีเจอร์หายไปทั้งนาที
+export async function getFeatureFlags(): Promise<Record<string, boolean>> {
     "use cache";
-    cacheLife("minutes");
-    return api.getFeatureFlags();
+    const flags = await api.fetchFeatureFlags();
+    if (flags) {
+        cacheLife("minutes");
+        return flags;
+    }
+    cacheLife("seconds");
+    return {};
 }
 
 export async function isFeatureEnabled(key: string): Promise<boolean> {

@@ -5,14 +5,14 @@ import Navbar from "@/app/components/Navbar";
 import Footer from "@/app/components/Footer";
 import Card from "@/components/ui/Card";
 import { authorizedFetch } from "@/lib/session";
-import { isFeatureEnabled } from "@/lib/publicData";
+import { featuresEnabledNow } from "@/lib/featureFlags";
 import type { PaperGroup } from "@/lib/paper/groups";
 
 // กลุ่มสอบกระดาษของฉัน — ที่เป็นผู้จัดก่อน แล้วตามด้วยที่เข้าร่วม (CLAUDE.md ข้อ 6.9.1)
 export const metadata = { title: "กลุ่มสอบกระดาษ", robots: { index: false } };
 
 export default async function PaperGroupsPage() {
-    const [paperOn, groupOn] = await Promise.all([isFeatureEnabled("paper_exam"), isFeatureEnabled("paper_group_exam")]);
+    const [paperOn, groupOn] = await featuresEnabledNow("paper_exam", "paper_group_exam");
     if (!paperOn || !groupOn) notFound();
     const res = await authorizedFetch("/store/paper-groups");
     const groups: PaperGroup[] = res.ok ? (await res.json()).data : [];

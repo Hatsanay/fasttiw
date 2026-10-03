@@ -10,7 +10,7 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import { authorizedFetch } from "@/lib/session";
 import { productCoverUrl } from "@/lib/api";
-import { isFeatureEnabled } from "@/lib/publicData";
+import { featuresEnabledNow } from "@/lib/featureFlags";
 
 export const metadata = { title: "คลังข้อสอบของฉัน" };
 
@@ -31,10 +31,9 @@ const STATUS_LABEL: Record<Entitlement["effective_status"], string> = {
 
 export default async function LibraryPage() {
     // ปุ่ม "สอบแบบกระดาษ" ขึ้นเฉพาะตอนเปิดฟีเจอร์ paper_exam (เมนู "เปิดใช้งานระบบ" ของแอดมิน)
-    const [res, paperEnabled, groupsEnabled] = await Promise.all([
+    const [res, [paperEnabled, groupsEnabled]] = await Promise.all([
         authorizedFetch("/store/my/entitlements"),
-        isFeatureEnabled("paper_exam"),
-        isFeatureEnabled("paper_group_exam"),
+        featuresEnabledNow("paper_exam", "paper_group_exam"),
     ]);
     const { data: entitlements }: { data: Entitlement[] } = res.ok ? await res.json() : { data: [] };
 

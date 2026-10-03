@@ -3,8 +3,9 @@
 import { useEffect, useRef } from "react";
 import { cn } from "@/lib/cn";
 import { CHOICE_LABELS, QUESTIONS_PER_PAGE, type Point } from "@/lib/paper/layout";
-import { RECTIFY_PX_PER_MM, SHADOW_SCORE, grayToRgba, lightingScore, type GrayImage, type QuestionReading } from "@/lib/paper/omr";
-import { CURLED_PAPER_REASON, cropQuestionRow, grayToJpeg, readPage, type LocatedPage } from "@/lib/paper/scan";
+import { SHADOW_SCORE, grayToRgba, type GrayImage, type QuestionReading } from "@/lib/paper/omr";
+import { CURLED_PAPER_REASON, cropQuestionRow, grayToJpeg, type LocatedPage } from "@/lib/paper/scan";
+import { analyzePage } from "@/lib/paper/scanWorker";
 
 // ชิ้นส่วนที่หน้าตรวจใบเดียว (forms/[code]/ScanClient) กับหน้าสแกนทั้งกองของกลุ่ม (groups/[id]/scan) ใช้ร่วมกัน
 // กติกาเดียวกันทุกที่: **ไม่เดา** — ข้อที่ฝนหลายวง/จาง/ลบไม่หมด ต้องให้คนเลือกเองก่อนส่งได้
@@ -44,13 +45,15 @@ export async function scanPage(
     { id, rect }: Extract<LocatedPage, { ok: true }>,
     form: { pages: number; choice_counts: number[] }
 ): Promise<{ ok: true; scan: PageScan } | { ok: false; reason: string }> {
-    const read = id.pages === form.pages ? readPage(rect, form.choice_counts, id.page) : null;
+    // อ่านวง + วัดเงาใน Web Worker (จอไม่ค้าง) — scanWorker.ts
+    const analysis = id.pages === form.pages ? await analyzePage(rect, form.choice_counts, id.page) : null;
+    const read = analysis?.read;
     if (!read) return { ok: false, reason: "จำนวนหน้าไม่ตรงกับใบสอบนี้ — ใช้กระดาษคำตอบที่ดาวน์โหลดจากใบสอบนี้เท่านั้น" };
     if (read.problem) return { ok: false, reason: CURLED_PAPER_REASON };
-    const blob = await grayToJpeg(rect);
+    const blob = analysis.jpeg ?? (await grayToJpeg(rect));
     return {
         ok: true,
-        scan: { rect, readings: read.readings, blob, preview: URL.createObjectURL(blob), shadow: lightingScore(rect, RECTIFY_PX_PER_MM) < SHADOW_SCORE },
+        scan: { rect, readings: read.readings, blob, preview: URL.createObjectURL(blob), shadow: analysis.shadow < SHADOW_SCORE },
     };
 }
 

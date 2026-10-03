@@ -9,7 +9,7 @@ import type { Point } from "./layout";
 
 // รูปจากมือถือรุ่นใหม่ 48-200MP ใหญ่เกินจำเป็นมาก (กระดาษ A4 เต็มเฟรม 4000px ≈ 14 px/มม. ส่วนผังอ่านที่ 5 px/มม.)
 // ย่อก่อนเพื่อไม่ให้หน่วยความจำมือถือเต็ม — รูป 12MP (4000×3000) ทั่วไปไม่ถูกย่อ ผลอ่านจึงเหมือนตอนวัดความแม่น
-const MAX_SIDE = 4000;
+export const MAX_SIDE = 4000;
 
 export async function loadGray(file: Blob): Promise<GrayImage> {
     const bitmap = await createImageBitmap(file);

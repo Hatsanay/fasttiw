@@ -15,6 +15,7 @@ import OwnedSwitch from "@/app/components/OwnedSwitch";
 import { productCoverUrl, formatBaht, compareAtPrice } from "@/lib/api";
 import { getPublicProduct, getSampleQuestions, getPublicProducts } from "@/lib/publicData";
 import { SITE_URL } from "@/lib/site";
+import RichDescription from "@/app/components/RichDescription";
 
 // อธิบายสั้นสำหรับ meta description/OG — ตัดจาก prod_description จริงถ้ามี ไม่งั้น fallback เป็นประโยค
 // มาตรฐานที่ยังใส่ชื่อ+จำนวนข้อจริงของ product นั้นๆ (ไม่ใช้ข้อความเดียวกันซ้ำทุกหน้าเหมือนก่อนแก้)
@@ -181,7 +182,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                         <p className="text-sm text-slate-400 mb-6">{product.question_count.toLocaleString("th-TH")} ข้อ พร้อมเฉลยละเอียด</p>
 
                         {product.prod_description && (
-                            <p className="text-slate-600 leading-relaxed mb-8 whitespace-pre-line">{product.prod_description}</p>
+                            <RichDescription text={product.prod_description} className="mb-8" />
                         )}
 
                         <div className="mt-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 pt-6 border-t border-slate-100">
