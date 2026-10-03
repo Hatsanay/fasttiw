@@ -55,7 +55,7 @@ function PackageCard({ pkg, eager }: { pkg: StorePackage; eager: boolean }) {
     return (
         <Card id={pkg.pkg_id} className="scroll-mt-24 overflow-hidden">
             <div className="grid md:grid-cols-[300px_minmax(0,1fr)]">
-                <div className="border-b border-slate-100 bg-slate-50/70 p-5 sm:p-6 md:border-b-0 md:border-r">
+                <div className="border-b border-slate-100 bg-slate-50/70 p-5 sm:p-6 md:flex md:flex-col md:justify-center md:border-b-0 md:border-r">
                     <div>
                         {/* สัดส่วน A4 แนวตั้ง (210:297) เหมือนปกชุดข้อสอบทุกจุดในเว็บ */}
                         <div className="relative mx-auto aspect-210/297 w-full max-w-[250px] overflow-hidden rounded-xl bg-white shadow-md shadow-slate-300/40 ring-1 ring-slate-200/70">
