@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
+    BarChart3,
     Camera,
     Check,
     Copy,
@@ -333,6 +334,16 @@ export default function GroupClient({ initial }: { initial: PaperGroup }) {
                                     เริ่มรอบสอบใหม่
                                 </Button>
                             </>
+                        )}
+                        {/* ผลสอบของกลุ่ม — รอบก่อนๆ ดูได้แม้รอบปัจจุบันยังไม่ได้สร้างชุดสอบ */}
+                        {(formsCount > 0 || group.round > 1) && (
+                            <Link
+                                href={`/exam/paper/groups/${group.id}/results`}
+                                className="mt-3 flex w-full items-center justify-center gap-2 rounded-full border border-brand-200 px-4 py-2.5 text-sm font-medium text-brand-700 hover:bg-brand-50"
+                            >
+                                <BarChart3 size={16} />
+                                ดูผลสอบของกลุ่ม + ส่งออก Excel
+                            </Link>
                         )}
                     </Card>
 

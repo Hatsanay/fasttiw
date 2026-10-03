@@ -57,3 +57,32 @@ export function inviteUrl(code: string): string {
     const base = typeof window !== "undefined" ? window.location.origin : "";
     return `${base}/exam/paper/join/${code}`;
 }
+
+/** ผลสอบของกลุ่ม (เฉพาะผู้จัด) — เรียงตามชื่อ ไม่มีอันดับ · ตรงกับ buildGroupResults ใน backend */
+export type GroupMemberResult = {
+    score: number;
+    /** null = ชุดนี้ไม่ใช้ระบบคะแนน */
+    earned: number | null;
+    max: number | null;
+    correct: number;
+    total: number;
+    /** null = ชุดนี้ไม่ได้ตั้งเกณฑ์ผ่าน */
+    passed: boolean | null;
+    failed_subjects: string[];
+    graded_at: string;
+    /** tpc_id → % ทำถูกของหมวดนั้นในใบนี้ */
+    topics: Record<string, number>;
+};
+
+export type GroupResults = {
+    title: string;
+    prod_name: string;
+    round: number;
+    current_round: number;
+    rounds: { round: number; graded: number }[];
+    has_criterion: boolean;
+    summary: { members: number; with_form: number; graded: number; average_score: number | null; passed: number | null };
+    /** ผลรายหมวดของทั้งกลุ่ม หมวดที่อ่อนสุดก่อน */
+    topics: { tpc_id: string; tpc_name: string; accuracy: number; members: number }[];
+    members: { customer_id: string; name: string; is_owner: boolean; form: PaperGroupForm | null; result: GroupMemberResult | null }[];
+};
