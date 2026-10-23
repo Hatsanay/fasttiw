@@ -76,16 +76,28 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
     );
 
     // ชิ้นที่แสดงเฉพาะคนที่ยังไม่ซื้อ — ใช้ตัวเดียวกันทั้งตอนรอ (fallback) และตอนรู้ผลแล้ว จะได้ไม่กระพริบ
-    const addToCart = (
-        <AddToCartButton
-            product={{
-                prod_id: product.prod_id,
-                prod_name: product.prod_name,
-                prod_price: product.prod_price,
-                prod_is_free: product.prod_is_free,
-                prod_cover_url: product.prod_cover_url,
-            }}
-        />
+    const cartItem = {
+        prod_id: product.prod_id,
+        prod_name: product.prod_name,
+        prod_price: product.prod_price,
+        prod_is_free: product.prod_is_free,
+        prod_cover_url: product.prod_cover_url,
+    };
+    const addToCart = <AddToCartButton product={cartItem} />;
+    // ถือแบบมีวันหมดอายุ → ทำข้อสอบได้ + ต่ออายุล่วงหน้าได้ (นับต่อจากวันหมดอายุเดิม — กติกาซื้อซ้ำ 2026-10-23)
+    // ถือแบบถาวรไม่มีปุ่มซื้อเลย (backend ปฏิเสธการซื้อซ้ำด้วย)
+    const ownedTimed = (expiresAt: string) => (
+        <div className="flex flex-col items-stretch gap-2 sm:items-end">
+            <div className="flex flex-col gap-2 sm:flex-row">
+                <Link href={`/exam/${product.prod_id}`}>
+                    <Button size="lg" className="w-full sm:w-auto">ไปทำข้อสอบ</Button>
+                </Link>
+                <AddToCartButton product={cartItem} label="ต่ออายุ" variant="secondary" />
+            </div>
+            <p className="text-xs text-slate-500">
+                ใช้ได้ถึง {new Date(expiresAt).toLocaleDateString("th-TH", { timeZone: "Asia/Bangkok", day: "numeric", month: "short", year: "numeric" })} · ต่ออายุแล้วนับต่อจากวันหมดอายุเดิม ไม่เสียวันที่เหลือ
+            </p>
+        </div>
     );
     const sampleLink = (
         <Link
@@ -209,6 +221,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                                             <Button size="lg">ไปทำข้อสอบ</Button>
                                         </Link>
                                     }
+                                    ownedTimed={ownedTimed}
                                     notOwned={addToCart}
                                 />
                             </Suspense>

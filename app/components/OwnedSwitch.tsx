@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { getOwnedProductIds } from "@/lib/session";
+import { getOwnership } from "@/lib/session";
 
 // เลือกแสดง `owned` หรือ `notOwned` ตามว่าลูกค้าที่ login อยู่ถือสิทธิ์ชุดนี้ไหม (2026-09-24)
 //
@@ -8,17 +8,24 @@ import { getOwnedProductIds } from "@/lib/session";
 // ยังไม่ซื้อ เพราะคนที่เปิดหน้าสินค้าเกือบทั้งหมดคือคนที่ยังไม่ซื้อ — เจ้าของชุดจะเห็นปุ่มสลับเป็น
 // "ไปทำข้อสอบ" หลังจากนั้นเสี้ยววินาที
 //
+// ownedTimed (ไม่บังคับ) = ถือแบบมีวันหมดอายุ — รับวันหมดอายุไปแสดงปุ่ม "ต่ออายุ" (กติกาซื้อซ้ำ 2026-10-23:
+// ชุดถาวรซื้อซ้ำไม่ได้ ชุดมีวันหมดอายุต่อล่วงหน้าได้) · ไม่ส่งมา = ใช้ `owned` เหมือนเดิม
+//
 // ของทั้งสองฝั่งส่งมาเป็น JSX ที่เรนเดอร์ไว้แล้ว component นี้ไม่รู้หน้าตาอะไรเลย ใช้ซ้ำได้ทุกจุด
-// (getOwnedProductIds ครอบ React cache ไว้ เรียกหลายจุดในหน้าเดียวกันยิง backend ครั้งเดียว)
+// (getOwnership ครอบ React cache ไว้ เรียกหลายจุดในหน้าเดียวกันยิง backend ครั้งเดียว)
 export default async function OwnedSwitch({
     productId,
     owned,
+    ownedTimed,
     notOwned = null,
 }: {
     productId: string;
     owned: ReactNode;
+    ownedTimed?: (expiresAt: string) => ReactNode;
     notOwned?: ReactNode;
 }) {
-    const ownedIds = await getOwnedProductIds();
-    return <>{ownedIds.has(productId) ? owned : notOwned}</>;
+    const ownership = await getOwnership();
+    if (!ownership.has(productId)) return <>{notOwned}</>;
+    const expiresAt = ownership.get(productId);
+    return <>{expiresAt && ownedTimed ? ownedTimed(expiresAt) : owned}</>;
 }

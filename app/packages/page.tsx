@@ -58,7 +58,7 @@ function PackageCard({ pkg, eager }: { pkg: StorePackage; eager: boolean }) {
                 <div className="border-b border-slate-100 bg-slate-50/70 p-5 sm:p-6 md:flex md:flex-col md:justify-center md:border-b-0 md:border-r">
                     <div>
                         {/* สัดส่วน A4 แนวตั้ง (210:297) เหมือนปกชุดข้อสอบทุกจุดในเว็บ */}
-                        <div className="relative mx-auto aspect-210/297 w-full max-w-[250px] overflow-hidden rounded-xl bg-white shadow-md shadow-slate-300/40 ring-1 ring-slate-200/70">
+                        <div className="relative mx-auto aspect-210/297 w-full max-w-62.5 overflow-hidden rounded-xl bg-white shadow-md shadow-slate-300/40 ring-1 ring-slate-200/70">
                             {cover ? (
                                 <Image
                                     src={cover}
@@ -77,7 +77,7 @@ function PackageCard({ pkg, eager }: { pkg: StorePackage; eager: boolean }) {
                             <ShareButton url={`/packages#${pkg.pkg_id}`} title={`แพ็กเกจ ${pkg.pkg_name} | Fasttiw`} className="absolute bottom-1.5 right-1.5 h-7 w-7" />
                         </div>
 
-                        <div className="mx-auto mt-5 max-w-[250px] md:max-w-none">
+                        <div className="mx-auto mt-5 max-w-62.5 md:max-w-none">
                             <p className="text-xs text-slate-500">ราคาแพ็กเกจ</p>
                             <div className="flex flex-wrap items-baseline gap-x-2">
                                 <span className="whitespace-nowrap text-3xl font-semibold text-brand-600">{formatBaht(pkg.pkg_price)}</span>

@@ -18,6 +18,8 @@ export default function CartClient({ isLoggedIn }: { isLoggedIn: boolean }) {
     const [items, setItems] = useState<CartItem[] | null>(null);
     const [couponCode, setCouponCode] = useState("");
     const [isPending, startTransition] = useTransition();
+    // ชุดที่ backend ปฏิเสธเพราะลูกค้ามีแบบไม่มีวันหมดอายุอยู่แล้ว (ซื้อซ้ำไม่ได้ — กติกา 2026-10-23) ไฮไลต์ให้กดนำออก
+    const [ownedIds, setOwnedIds] = useState<string[]>([]);
 
     useEffect(() => {
         function sync() {
@@ -41,6 +43,7 @@ export default function CartClient({ isLoggedIn }: { isLoggedIn: boolean }) {
             );
             if ("error" in result) {
                 toast.error(result.error);
+                if (result.ownedIds) setOwnedIds(result.ownedIds);
                 return;
             }
             clearCart();
@@ -66,7 +69,7 @@ export default function CartClient({ isLoggedIn }: { isLoggedIn: boolean }) {
                         {items.map((item) => {
                             const cover = productCoverUrl(item.prod_cover_url);
                             return (
-                                <Card key={item.prod_id} className="flex items-center gap-4 p-4">
+                                <Card key={item.prod_id} className={`flex items-center gap-4 p-4${ownedIds.includes(item.prod_id) ? " ring-1 ring-red-200" : ""}`}>
                                     <div className="relative h-16 w-20 shrink-0 rounded-lg overflow-hidden bg-slate-50">
                                         {cover && <Image src={cover} alt={item.prod_name} fill className="object-cover" sizes="80px" />}
                                     </div>
@@ -76,6 +79,9 @@ export default function CartClient({ isLoggedIn }: { isLoggedIn: boolean }) {
                                             <p className="text-sm text-green-600 font-semibold">ฟรี</p>
                                         ) : (
                                             <p className="text-sm text-brand-600 font-semibold">{formatBaht(item.prod_price)}</p>
+                                        )}
+                                        {ownedIds.includes(item.prod_id) && (
+                                            <p className="mt-0.5 text-xs font-medium text-red-600">คุณมีชุดนี้แบบไม่มีวันหมดอายุอยู่แล้ว — นำออกจากตะกร้าก่อนชำระเงิน</p>
                                         )}
                                     </div>
                                     <button

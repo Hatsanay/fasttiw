@@ -7,7 +7,16 @@ import { toast } from "sonner";
 import Button from "@/components/ui/Button";
 import { addToCart, getCart, type CartItem } from "@/lib/cart";
 
-export default function AddToCartButton({ product }: { product: CartItem }) {
+// label/variant ไม่บังคับ — ใช้ตอนลูกค้าถือแบบมีวันหมดอายุแล้วซื้อซ้ำเพื่อ "ต่ออายุ" (กติกาซื้อซ้ำ 2026-10-23)
+export default function AddToCartButton({
+    product,
+    label = "เพิ่มลงตะกร้า",
+    variant = "primary",
+}: {
+    product: CartItem;
+    label?: string;
+    variant?: "primary" | "secondary";
+}) {
     const router = useRouter();
     const [added, setAdded] = useState(false);
 
@@ -29,9 +38,9 @@ export default function AddToCartButton({ product }: { product: CartItem }) {
     }
 
     return (
-        <Button size="lg" onClick={handleClick} className="w-full sm:w-auto">
+        <Button size="lg" variant={variant} onClick={handleClick} className="w-full sm:w-auto">
             {added ? <Check size={18} /> : <ShoppingCart size={18} />}
-            {added ? "อยู่ในตะกร้าแล้ว — ไปที่ตะกร้า" : "เพิ่มลงตะกร้า"}
+            {added ? "อยู่ในตะกร้าแล้ว — ไปที่ตะกร้า" : label}
         </Button>
     );
 }

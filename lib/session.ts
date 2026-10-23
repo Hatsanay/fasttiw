@@ -87,11 +87,18 @@ export const getMyProfile = cache(async function getMyProfile(): Promise<MyProfi
 // ใช้โชว์ badge "ซื้อแล้ว" ในหน้าแคตตาล็อก/รายละเอียดสินค้า คืนเซ็ตว่างถ้ายังไม่ login
 // ครอบ React cache ด้วยเหตุผลเดียวกัน — หน้าสินค้ามี OwnedSwitch หลายจุด
 export const getOwnedProductIds = cache(async function getOwnedProductIds(): Promise<Set<string>> {
+    return new Set((await getOwnership()).keys());
+});
+
+// ชุดที่ลูกค้าถือสิทธิ์ใช้งานได้อยู่ → วันหมดอายุ (null = ไม่มีวันหมดอายุ) — แยกได้ว่าชุดไหน "ต่ออายุล่วงหน้า" ได้
+// กติกาซื้อซ้ำ (2026-10-23): ถาวร = ซื้อซ้ำไม่ได้ · มีวันหมดอายุ = ต่อล่วงหน้าได้ (backend /store/checkout บังคับจริง)
+// backend ส่งมาแถวเดียวต่อชุดแล้ว (เลือกแถวที่ดีที่สุด)
+export const getOwnership = cache(async function getOwnership(): Promise<Map<string, string | null>> {
     const session = await getSession();
-    if (!session) return new Set();
+    if (!session) return new Map();
 
     const res = await authorizedFetch("/store/my/entitlements");
-    if (!res.ok) return new Set();
-    const { data } = (await res.json()) as { data: { ent_product_id: string; effective_status: string }[] };
-    return new Set(data.filter((e) => e.effective_status === "active").map((e) => e.ent_product_id));
+    if (!res.ok) return new Map();
+    const { data } = (await res.json()) as { data: { ent_product_id: string; effective_status: string; ent_expires_at: string | null }[] };
+    return new Map(data.filter((e) => e.effective_status === "active").map((e) => [e.ent_product_id, e.ent_expires_at]));
 });

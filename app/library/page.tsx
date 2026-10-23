@@ -134,7 +134,16 @@ export default async function LibraryPage() {
                                         <h3 className="text-sm font-medium text-slate-800 line-clamp-2 leading-snug">{e.prod_name}</h3>
                                         {e.ent_expires_at && (
                                             <p className="text-[11px] text-slate-400">
-                                                หมดอายุ {new Date(e.ent_expires_at).toLocaleDateString("th-TH")}
+                                                {e.effective_status === "expired" ? "หมดอายุเมื่อ" : "หมดอายุ"} {new Date(e.ent_expires_at).toLocaleDateString("th-TH")}
+                                                {/* แบบมีวันหมดอายุต่อล่วงหน้าได้ (กติกาซื้อซ้ำ 2026-10-23) */}
+                                                {e.effective_status === "active" && (
+                                                    <>
+                                                        {" · "}
+                                                        <Link href={`/products/${e.ent_product_id}`} className="text-brand-600 hover:underline">
+                                                            ต่ออายุ
+                                                        </Link>
+                                                    </>
+                                                )}
                                             </p>
                                         )}
                                         <div className="mt-auto pt-1 flex flex-col gap-1.5">
@@ -154,6 +163,11 @@ export default async function LibraryPage() {
                                                     )}
                                                     <ExportPdfButton productId={e.ent_product_id} />
                                                 </>
+                                            ) : e.effective_status === "expired" ? (
+                                                // หมดอายุแล้วซื้อใหม่ = เปิดใช้สิทธิ์เดิมอีกครั้ง (คะแนน/ประวัติเดิมอยู่ครบ)
+                                                <Link href={`/products/${e.ent_product_id}`}>
+                                                    <Button size="sm" variant="secondary" className="w-full">ซื้อเพื่อใช้งานอีกครั้ง</Button>
+                                                </Link>
                                             ) : (
                                                 <Button size="sm" className="w-full" disabled>
                                                     ใช้งานไม่ได้

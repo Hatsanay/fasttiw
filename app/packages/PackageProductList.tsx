@@ -51,7 +51,7 @@ export default function PackageProductList({ products }: { products: PackageProd
                             <Link
                                 href={`/products/${p.prod_id}`}
                                 title={p.prod_name}
-                                className="group flex h-full min-h-[84px] items-center gap-3 rounded-xl border border-slate-100 p-2.5 transition-colors hover:border-brand-200 hover:bg-brand-50/40"
+                                className="group flex h-full min-h-21 items-center gap-3 rounded-xl border border-slate-100 p-2.5 transition-colors hover:border-brand-200 hover:bg-brand-50/40"
                             >
                                 <div className="relative aspect-210/297 w-11 shrink-0 overflow-hidden rounded-md bg-slate-50 ring-1 ring-slate-200/70">
                                     {cover && <Image src={cover} alt="" fill className="object-cover" sizes="44px" />}
@@ -66,7 +66,7 @@ export default function PackageProductList({ products }: { products: PackageProd
                 })}
                 {Array.from({ length: fillers }, (_, i) => (
                     // ช่องว่างกันการ์ดหดตอนหน้าสุดท้ายมีไม่ครบ 4 ชุด · บนมือถือ (คอลัมน์เดียว) ไม่ต้องเว้น — แค่เลื่อนหน้าจอ
-                    <li key={`filler-${i}`} aria-hidden className="invisible hidden min-h-[84px] sm:block" />
+                    <li key={`filler-${i}`} aria-hidden className="invisible hidden min-h-21 sm:block" />
                 ))}
             </ul>
         </div>
